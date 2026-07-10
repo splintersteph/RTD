@@ -878,35 +878,53 @@ function pdpGotoStock(codart_wip) {
   }, 50);
 }
 
-function pdpShowDetail(code_client) {
-  const ref = pdpGetActiveCorrespondances().find(r => r.code_client === code_client);
-  if (!ref) return;
+// Construit le détail niveau par niveau (tenon, blister, FG...) d'une référence,
+// avec le stock et son équivalent FG par niveau. Réutilisée par pdpShowDetail (tuile
+// PDP) et par la modale de détail commande (commandes.js, encadré au survol du
+// stock) — NE PAS redupliquer cette construction ailleurs. `zones` optionnel
+// ({blister:[...], fg:[...]}) applique la même restriction de zone que
+// pdpGetTotalFGForRefZoned, pour que le détail affiché corresponde exactement au
+// total déjà montré.
+function pdpGetLevelsBreakdown(codart_wip, code_client, zones) {
+  const nom = pdpFindNomenclature(codart_wip, code_client);
 
-  const nom = pdpFindNomenclature(ref.codart_wip, ref.code_client);
+  // blisterIdx calculé systématiquement (pas seulement si zones) : sert aussi au
+  // regroupement en 3 catégories (tenons / blisters / FG) côté affichage.
+  let blisterIdx = -1;
+  if (nom) {
+    blisterIdx = nom.etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
+    if (blisterIdx < 0) blisterIdx = nom.etapes.length > 1 ? 1 : 0;
+  }
 
-  // Niveaux de stock
-  let levels = [];
+  let levels;
   if (nom) {
     levels = nom.etapes.map((e, i) => {
       let cumRatio = 1;
       for (let j = i; j < nom.etapes.length - 1; j++) {
         if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
       }
-      const stk = (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
-      // L'en-cours de production n'est compté qu'au premier niveau (le tenon brut) :
-      // un même lot suivi comme "en cours" à travers ses transformations successives
-      // (tenon → jointé → blister) ne représente qu'UNE seule quantité physique — le
-      // compter à chaque étape doublerait/triplerait artificiellement l'en-cours réel.
+      let stk;
+      if (zones && i === blisterIdx) stk = (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.blister) : 0;
+      else if (zones && i > blisterIdx) stk = (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.fg) : 0;
+      else stk = (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
       const enc = (i === 0 && typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
       const total = stk + enc;
-      return { label: e.label, codart: e.codart, stk, enc, total, fgEquiv: cumRatio > 1 ? Math.floor(total/cumRatio) : total, isFG: e.ratio === null };
+      return { label: e.label, codart: e.codart, stk, enc, total, fgEquiv: cumRatio > 1 ? Math.floor(total/cumRatio) : total, isFG: e.ratio === null, isBlister: i === blisterIdx };
     });
   } else {
-    const stk = pdpGetStockForWip(ref.codart_wip);
-    const enc = pdpGetEnCoursForWip(ref.codart_wip);
-    levels = [{ label: ref.codart_wip, codart: ref.codart_wip, stk, enc, total: stk+enc, fgEquiv: stk+enc, isFG: true }];
+    const stk = (zones && typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(codart_wip, zones.fg) : pdpGetStockForWip(codart_wip);
+    const enc = pdpGetEnCoursForWip(codart_wip);
+    levels = [{ label: codart_wip, codart: codart_wip, stk, enc, total: stk+enc, fgEquiv: stk+enc, isFG: true, isBlister: false }];
   }
   const totalFG = levels.reduce((s,l) => s + l.fgEquiv, 0);
+  return { levels, totalFG, blisterIdx };
+}
+
+function pdpShowDetail(code_client) {
+  const ref = pdpGetActiveCorrespondances().find(r => r.code_client === code_client);
+  if (!ref) return;
+
+  const { levels, totalFG } = pdpGetLevelsBreakdown(ref.codart_wip, ref.code_client, null);
 
   // Code FG pour les commandes : utiliser directement code_client (c'est le FG connu)
   // au lieu de remonter la nomenclature (qui peut trouver un autre FG partageant le même WIP)
