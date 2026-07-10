@@ -360,8 +360,10 @@ function renderPdpPage() {
       return (a._shortName||a.libelle_fg).localeCompare(b._shortName||b.libelle_fg);
     });
 
-    mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">';
-    sortedRefs.forEach(r => {
+    // Fonction de rendu d'une tuile individuelle (comportement inchangé) — extraite
+    // pour être réutilisable telle quelle par les références "isolées" (aucune autre
+    // ref ne partage leur codart_wip de départ).
+    function renderTile(r) {
       const nom = pdpFindNomenclature(r.codart_wip, r.code_client);
 
       // Calculer les niveaux avec conversion en FG
@@ -407,8 +409,7 @@ function renderPdpPage() {
       const displayName = r._shortName || autoShort;
       const ofsEnCours = pdpGetOFsForRef(r.codart_wip, autoShort);
 
-      mainContent +=
-        '<div data-pdp-action="show-detail" data-pdp-arg="' + r.code_client + '" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:box-shadow .15s;display:flex;flex-direction:column;gap:8px;cursor:pointer"'
+      return '<div data-pdp-action="show-detail" data-pdp-arg="' + r.code_client + '" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:box-shadow .15s;display:flex;flex-direction:column;gap:8px;cursor:pointer"'
         +' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\'" onmouseleave="this.style.boxShadow=\'none\'">'
 
         // En-tête : nom + code + badge total FG + bouton édition
@@ -483,9 +484,95 @@ function renderPdpPage() {
             +'</div>'
           : '')
 
-
-
         +'</div>';
+    }
+
+    // Rendu d'une carte "famille" groupant plusieurs FG qui partagent le même WIP de
+    // départ (ex: boîte de 10 / boîte de 5 d'un même tenon) : le tronc commun (tenon,
+    // blister...) n'est affiché QU'UNE FOIS en stock brut, puis une branche par FG
+    // avec son propre stock équivalent FG, ses commandes et sa couverture — plutôt
+    // que plusieurs tuiles qui répètent les mêmes niveaux avec des chiffres qui ne
+    // sont que la même matière convertie différemment selon le ratio de chaque FG.
+    function renderFamilyGroup(group) {
+      const nomsMembres = group.map(r => pdpFindNomenclature(r.codart_wip, r.code_client));
+      if (nomsMembres.some(n => !n)) return group.map(renderTile).join('');
+
+      // Tronc commun : indices où TOUS les membres ont le même codart, sans jamais
+      // inclure le dernier niveau de chacun (toujours propre à son FG).
+      const minLen = Math.min(...nomsMembres.map(n => n.etapes.length));
+      let trunkLen = 0;
+      for (let i = 0; i < minLen - 1; i++) {
+        const codarts = nomsMembres.map(n => n.etapes[i].codart);
+        if (codarts.every(c => c === codarts[0])) trunkLen++;
+        else break;
+      }
+      if (trunkLen === 0) return group.map(renderTile).join('');
+
+      const trunkEtapes = nomsMembres[0].etapes.slice(0, trunkLen);
+      const famLabel = group[0].famille || group[0].libelle_fg;
+
+      const trunkHtml = trunkEtapes.map((e, i) => {
+        const stk = (typeof nomGetStock === 'function') ? nomGetStock(e.codart) : 0;
+        const enc = (i === 0 && typeof nomGetEnCours === 'function') ? nomGetEnCours(e.codart) : 0;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);margin-bottom:6px">'
+          + '<i class="ti ti-circle-dot" style="font-size:14px;color:'+col.text+'"></i>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:12px;font-weight:500">'+e.label+'</div>'
+          + '<div style="font-size:9px;color:var(--text-faint);font-family:monospace">'+e.codart+'</div>'
+          + '</div>'
+          + '<span style="font-size:14px;font-weight:700">'+(stk+enc).toLocaleString('fr')+'</span>'
+          + '</div>';
+      }).join('');
+
+      const branchesHtml = group.map(r => {
+        const totalFG = pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+        const cde = pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+        const ok = (totalFG - cde) >= 0;
+        const rupture = pdpCalcRupture(r.code_client, totalFG);
+        const displayName = r._shortName || pdpAutoShortName(r);
+        return '<div data-pdp-action="show-detail" data-pdp-arg="'+r.code_client+'" style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;background:var(--surface)"'
+          + ' onmouseenter="this.style.borderColor=\''+col.dot+'\'" onmouseleave="this.style.borderColor=\'var(--border)\'">'
+          + '<div style="font-size:13px;font-weight:700;color:'+col.text+'">'+displayName+'</div>'
+          + '<div style="font-size:9px;color:var(--text-faint);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+r.libelle_fg+'">'+r.libelle_fg+'</div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:var(--text-faint)">Stock FG</span><strong>'+totalFG.toLocaleString('fr')+'</strong></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px"><span style="color:var(--text-faint)">Commandé</span><strong style="color:#A32D2D">'+cde.toLocaleString('fr')+'</strong></div>'
+          + (rupture
+            ? '<span style="font-size:10px;font-weight:700;color:#A32D2D;background:#FCEBEB;padding:2px 8px;border-radius:20px"><i class="ti ti-alert-triangle" style="font-size:10px;vertical-align:-1px"></i> '+pdpFmtDate(rupture.date)+'</span>'
+            : '<span style="font-size:10px;font-weight:600;color:#27500A;background:#EAF3DE;padding:2px 8px;border-radius:20px">\u2713 Couvert</span>')
+          + '</div>';
+      }).join('');
+
+      return '<div style="grid-column:1/-1;background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+        + '<span style="font-size:13px;font-weight:700;color:'+col.text+'">'+famLabel+'</span>'
+        + '<span style="font-size:10px;color:var(--text-faint);background:var(--bg);padding:2px 7px;border-radius:20px">'+group.length+' FG \u00B7 tenon commun</span>'
+        + '</div>'
+        + trunkHtml
+        + '<div style="display:flex;justify-content:center;padding:2px 0 8px"><i class="ti ti-corner-down-right" style="font-size:14px;color:var(--text-faint);transform:rotate(90deg) scaleX(-1)"></i></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'
+        + branchesHtml
+        + '</div></div>';
+    }
+
+    // Regrouper par codart_wip de départ : les groupes de 2+ partagent le même tenon
+    // (ou point de départ WIP) et sont donc de bons candidats pour la carte famille.
+    const groupsByWip = {};
+    sortedRefs.forEach(r => {
+      (groupsByWip[r.codart_wip] = groupsByWip[r.codart_wip] || []).push(r);
+    });
+
+    mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">';
+    const seen = new Set();
+    sortedRefs.forEach(r => {
+      if (seen.has(r.code_client)) return;
+      const group = groupsByWip[r.codart_wip];
+      if (group.length > 1) {
+        group.forEach(g => seen.add(g.code_client));
+        mainContent += renderFamilyGroup(group);
+      } else {
+        seen.add(r.code_client);
+        mainContent += renderTile(r);
+      }
     });
 
     mainContent += '</div>';
