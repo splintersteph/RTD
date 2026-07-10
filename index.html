@@ -332,6 +332,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <button class="sidebar-item" id="nav-stock" onclick="setView('stock')"><i class="ti ti-package"></i>Stock</button>
     <button class="sidebar-item" id="nav-commandes" onclick="setView('commandes')"><i class="ti ti-shopping-cart"></i>Commandes</button>
     <button class="sidebar-item" id="nav-planning" onclick="setView('planning')"><i class="ti ti-table-import"></i>Planning Composite</button>
+    <button class="sidebar-item" id="nav-pultrusion" onclick="setView('pultrusion')"><i class="ti ti-columns-2"></i>Pultrusion</button>
     <button class="sidebar-item" onclick="openCalculateur()"><i class="ti ti-ruler-2"></i>Calculateur</button>
     <div class="sidebar-section">Filtres</div>
     <button class="sidebar-item" id="nav-all" onclick="setSideFilter('all')"><i class="ti ti-clipboard-list"></i>Tous les OF<span class="sidebar-badge" id="badge-all">0</span></button>
@@ -376,6 +377,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <div class="flex-view" id="view-pdp"></div>
       <div class="flex-view" id="view-besoins"></div>
       <div class="flex-view" id="view-conso"></div>
+      <div class="flex-view" id="view-pultrusion"></div>
       <div class="flex-view" id="view-stock"></div>
       <div class="flex-view" id="view-commandes"></div>
       <div class="flex-view" id="view-planning"></div>
@@ -2263,6 +2265,10 @@ function render(){
     if(typeof renderConsoPage==='function')renderConsoPage();
     else document.getElementById('view-conso').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Consommation…</div>';
   }
+  else if(currentView==='pultrusion'){
+    if(typeof renderPultrusionPage==='function')renderPultrusionPage();
+    else document.getElementById('view-pultrusion').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Pultrusion…</div>';
+  }
   else if(currentView==='stock'){
     if(typeof renderStockPage==='function')renderStockPage();
     else document.getElementById('view-stock').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Stock…</div>';
@@ -2274,22 +2280,22 @@ function render(){
   else if(currentView==='planning')renderPlanningComposite();
 }
 
-const VALID_VIEWS=['kanban','list','archives','3m','catalogue','gantt','stats','pdp','besoins','conso','stock','commandes','planning'];
+const VALID_VIEWS=['kanban','list','archives','3m','catalogue','gantt','stats','pdp','besoins','conso','stock','commandes','planning','pultrusion'];
 
 function setView(v,pushState=true){
   if(!VALID_VIEWS.includes(v))v='kanban';
   currentView=v;
   if(pushState&&location.hash!=='#'+v)history.pushState({view:v},'','#'+v);
-  const views={kanban:'kanban-view',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning'};
+  const views={kanban:'kanban-view',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
   Object.entries(views).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.style.display=k===v?'flex':'none';});
   document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.remove('active'));
-  const navMap={kanban:'nav-kanban',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning'};
+  const navMap={kanban:'nav-kanban',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
   if(navMap[v])document.getElementById(navMap[v])?.classList.add('active');
   if(v==='kanban'||v==='list'){sideFilter='all';stageFilter='';}
   document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
   const bnMap={kanban:'bn-kanban',list:'bn-list',archives:'bn-archives','3m':'bn-3m',catalogue:'bn-catalogue',gantt:'bn-gantt'};
   if(bnMap[v])document.getElementById(bnMap[v])?.classList.add('active');
-  const labels={kanban:'Kanban',list:'Liste',archives:'Archives','3m':'Objectif 3M',catalogue:'Catalogue',gantt:'Gantt',stats:'Statistiques',pdp:'PDP',besoins:'Besoins',conso:'Consommation',stock:'Stock',commandes:'Commandes',planning:'Planning Composite'};
+  const labels={kanban:'Kanban',list:'Liste',archives:'Archives','3m':'Objectif 3M',catalogue:'Catalogue',gantt:'Gantt',stats:'Statistiques',pdp:'PDP',besoins:'Besoins',conso:'Consommation',stock:'Stock',commandes:'Commandes',planning:'Planning Composite',pultrusion:'Pultrusion'};
   document.title='PlanProd — '+(labels[v]||v);
   render();
 }
@@ -3103,7 +3109,7 @@ function renderStatsPage() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-columns" style="vertical-align:-2px;margin-right:6px"></i>Avancement par étape</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-columns-2" style="vertical-align:-2px;margin-right:6px"></i>Avancement par étape</div>
           ${stageRows}
         </div>
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -4113,6 +4119,7 @@ loadData();
 <script src="/conso.js"></script>
 <script src="/pdp.js"></script>
 <script src="/gantt.js"></script>
+<script src="/pultrusion.js"></script>
 <script>
 // Appliquer les préférences PDP maintenant que pdp.js est chargé
 if (window._pdpPrefsToRestore) {
