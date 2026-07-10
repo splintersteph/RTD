@@ -109,29 +109,55 @@ function cdeShowOrderDetail(numCmd) {
   if (!lines.length) return;
   const client = lines[0].client;
 
-  const rowsHtml = lines.map(r => {
+  const rowsHtml = lines.map((r, idx) => {
     const zones = (typeof pdpGetZonesForClient === 'function') ? pdpGetZonesForClient(r.codcli) : null;
-    const stockFull = (typeof pdpGetTotalFGForRef === 'function')
-      ? pdpGetTotalFGForRef(r.codart_wip, r.code_client)
+    const breakdown = (typeof pdpGetLevelsBreakdown === 'function')
+      ? pdpGetLevelsBreakdown(r.codart_wip, r.code_client, zones)
       : null;
-    const stock = (zones && typeof pdpGetTotalFGForRefZoned === 'function')
-      ? pdpGetTotalFGForRefZoned(r.codart_wip, r.code_client, zones)
-      : stockFull;
+    const stock = breakdown ? breakdown.totalFG : null;
     const ok = stock !== null && stock >= r.qteRest;
-    // Client à zone dédiée (ex: Chaoran/BCHINE) : le badge affiche le stock DE LA
-    // ZONE, mais l'info-bulle au survol montre "zone/total" (ex: "1200/1800") pour
-    // ne pas perdre de vue le stock global.
-    const zoneLabel = zones
-      ? (zones.blister.join('+') === zones.fg.join('+')
-          ? zones.fg.join('+')
-          : 'blister '+zones.blister.join('+')+' / FG '+zones.fg.join('+'))
-      : '';
-    const titleAttr = (zones && stockFull !== null)
-      ? ' title="Zone '+zoneLabel+' : '+stock.toLocaleString('fr')+' / Stock total : '+stockFull.toLocaleString('fr')+'"'
-      : '';
+
+    // Encadré détaillé au survol : un vrai bloc HTML (pas la bulle native du
+    // navigateur), regroupé en 3 catégories lisibles — tenons, blisters, FG — en
+    // quantités BRUTES disponibles (pas l'équivalent FG, qui est déjà le total
+    // affiché sur le badge). Les étapes avant le blister (tenon brut, tenon
+    // jointé...) sont cumulées sur une seule ligne "Tenons".
+    const tooltipId = 'cde-lv-' + numCmd.replace(/[^a-zA-Z0-9]/g,'') + '-' + idx;
+    let tooltipHtml = '';
+    if (breakdown) {
+      const { levels, blisterIdx, totalFG } = breakdown;
+      const hasBlisterLevel = levels.length > 1 && blisterIdx >= 0 && blisterIdx < levels.length - 1;
+      const tenons   = levels.filter((l,i) => i < blisterIdx).reduce((s,l) => s + l.stk, 0);
+      const blisters = hasBlisterLevel ? levels.filter((l,i) => i === blisterIdx).reduce((s,l) => s + l.stk, 0) : 0;
+      const fg       = levels.filter((l,i) => hasBlisterLevel ? i > blisterIdx : i >= blisterIdx).reduce((s,l) => s + l.stk, 0);
+
+      const zoneTagBlister = zones ? ' <span style="color:var(--text-faint);font-weight:400">('+zones.blister.join('+')+')</span>' : '';
+      const zoneTagFG = zones ? ' <span style="color:var(--text-faint);font-weight:400">('+zones.fg.join('+')+')</span>' : '';
+
+      const ligne = (label, valeur, tag) =>
+        '<div style="display:flex;justify-content:space-between;gap:16px;padding:4px 0;font-size:12px">'
+        + '<span>'+label+(tag||'')+'</span>'
+        + '<span style="font-weight:600;white-space:nowrap">'+valeur.toLocaleString('fr')+'</span>'
+        + '</div>';
+
+      tooltipHtml = '<div id="'+tooltipId+'" style="display:none;position:absolute;right:0;top:100%;z-index:80;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);box-shadow:0 10px 34px rgba(0,0,0,.22);padding:12px 14px;min-width:230px;text-align:left;margin-top:6px">'
+        + '<div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">Stock disponible par niveau</div>'
+        + ligne('Tenons', tenons, '')
+        + (hasBlisterLevel ? ligne('Blisters', blisters, zoneTagBlister) : '')
+        + ligne('FG', fg, zoneTagFG)
+        + '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:700">'
+        + '<span>Total (équiv. FG)</span><span>'+totalFG.toLocaleString('fr')+'</span>'
+        + '</div></div>';
+    }
+
     const stockBadge = stock === null
       ? '<span style="font-size:11px;color:var(--text-faint)">—</span>'
-      : '<span'+titleAttr+' style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+';cursor:'+(zones?'help':'default')+'"><i class="ti '+(ok?'ti-check':'ti-x')+'" style="vertical-align:-1px;margin-right:3px;font-size:10px"></i>'+stock.toLocaleString('fr')+(zones?' <i class="ti ti-map-pin" style="font-size:9px;vertical-align:1px;opacity:.6"></i>':'')+'</span>';
+      : '<span onmouseenter="var t=document.getElementById(\''+tooltipId+'\');if(t)t.style.display=\'block\'" onmouseleave="var t=document.getElementById(\''+tooltipId+'\');if(t)t.style.display=\'none\'"'
+        + ' style="position:relative;display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+';cursor:help">'
+        + '<i class="ti '+(ok?'ti-check':'ti-x')+'" style="vertical-align:-1px;margin-right:3px;font-size:10px"></i>'+stock.toLocaleString('fr')
+        + (zones?' <i class="ti ti-map-pin" style="font-size:9px;vertical-align:1px;opacity:.6"></i>':'')
+        + tooltipHtml
+        + '</span>';
     return '<tr onclick="'+(typeof pdpShowDetail==='function'?'closeOverlay();pdpShowDetail(\''+r.code_client+'\')':'')+'" style="cursor:'+(typeof pdpShowDetail==='function'?'pointer':'default')+'">'
       + '<td style="font-size:12px">'+r.libelle+'<div style="font-size:9px;color:var(--text-faint);font-family:monospace">'+r.codart_wip+'</div></td>'
       + '<td style="text-align:right;font-size:12px">'+r.qteCde.toLocaleString('fr')+'</td>'
@@ -164,7 +190,7 @@ function cdeShowOrderDetail(numCmd) {
           <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalRestant.toLocaleString('fr')}</div>
         </div>
       </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
         <table class="cat-table" style="width:100%;table-layout:fixed">
           <colgroup>
             <col style="width:34%"><col style="width:11%"><col style="width:11%">
