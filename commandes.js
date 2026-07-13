@@ -25,10 +25,14 @@ function cdeResolveToFG(ref, code_client) {
   return fgEtape ? fgEtape.codart : ref;
 }
 
-// Toutes les commandes ouvertes (LIGNE_CDE_='N') pour un code FG donné
+// Toutes les commandes ouvertes (restant à livrer > 0, filtré plus bas) pour un
+// code FG donné. IMPORTANT : ne PAS filtrer sur LIGNE_CDE_='N' — ce champ ne veut
+// pas dire "ouverte/fermée" (constaté sur le fichier réel : des lignes 'O' ont
+// encore un restant non nul, et 'N' semble plutôt indiquer "aucune livraison
+// encore enregistrée"). Le seul critère fiable est QTE_CDE > QTE_LIVREE.
 function cdeGetForRef(fgCode) {
   return (pcData.commandes||[])
-    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.LIGNE_CDE_||'').trim() === 'N')
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode)
     .map(r => ({
       numCmd:  String(r.NUM_COM||''),
       client:  String(r.LIBFOU||r.CODCLI||''),
