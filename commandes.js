@@ -154,16 +154,16 @@ function cdeShowOrderDetail(numCmd) {
         + '</div></div>';
     }
 
-    const stockBadge = stock === null
-      ? '<span style="font-size:11px;color:var(--text-faint)">—</span>'
+    const stockBadge = (stock === null || !r.codart_wip)
+      ? '<span style="font-size:11px;color:var(--text-faint)" title="Référence non suivie dans les correspondances (pas de nomenclature) — stock inconnu">— non suivi</span>'
       : '<span onmouseenter="var t=document.getElementById(\''+tooltipId+'\');if(t)t.style.display=\'block\'" onmouseleave="var t=document.getElementById(\''+tooltipId+'\');if(t)t.style.display=\'none\'"'
         + ' style="position:relative;display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+';cursor:help">'
         + '<i class="ti '+(ok?'ti-check':'ti-x')+'" style="vertical-align:-1px;margin-right:3px;font-size:10px"></i>'+stock.toLocaleString('fr')
         + (zones?' <i class="ti ti-map-pin" style="font-size:9px;vertical-align:1px;opacity:.6"></i>':'')
         + tooltipHtml
         + '</span>';
-    return '<tr onclick="'+(typeof pdpShowDetail==='function'?'closeOverlay();pdpShowDetail(\''+r.code_client+'\')':'')+'" style="cursor:'+(typeof pdpShowDetail==='function'?'pointer':'default')+'">'
-      + '<td style="font-size:12px">'+r.libelle+'<div style="font-size:9px;color:var(--text-faint);font-family:monospace">'+r.codart_wip+'</div></td>'
+    return '<tr onclick="'+(typeof pdpShowDetail==='function'?'closeOverlay();pdpShowDetail(\''+r.code_client+'\')':'')+'" style="cursor:'+(typeof pdpShowDetail==='function'&&r.codart_wip?'pointer':'default')+'">'
+      + '<td style="font-size:12px">'+r.libelle+(r.codart_wip?'<div style="font-size:9px;color:var(--text-faint);font-family:monospace">'+r.codart_wip+'</div>':'')+'</td>'
       + '<td style="text-align:right;font-size:12px">'+r.qteCde.toLocaleString('fr')+'</td>'
       + '<td style="text-align:right;font-size:12px;color:var(--text-muted)">'+r.qteLiv.toLocaleString('fr')+'</td>'
       + '<td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">'+r.qteRest.toLocaleString('fr')+'</span></td>'
@@ -471,16 +471,52 @@ function renderCommandesPage() {
 
     const refsForClient = byClient[cdeSelectedClient] || [];
     const rows = [];
-    refsForClient.forEach(r => {
-      const fg = cdeResolveToFG(r.codart_wip, r.code_client);
-      let cmds = cdeGetForRef(fg);
-      if (isRTD) cmds = cmds.filter(c => (c.client || 'Client non renseigné') === cdeSelectedFinalClient);
-      cmds.forEach(c => rows.push(Object.assign({}, c, {
-        libelle: r.libelle_fg,
-        codart_wip: r.codart_wip,
-        code_client: r.code_client,
-      })));
-    });
+
+    if (isRTD && cdeSelectedFinalClient) {
+      // Client d'abord, produit ensuite : toutes les commandes de ce client final,
+      // directement depuis les données brutes (CODCLI/LIBFOU) — sans dépendre de
+      // PDP_CORRESPONDANCES. Certaines références commandées (forets, kits,
+      // consommables...) n'y sont jamais suivies (pas de nomenclature tenon→
+      // blister→FG) et étaient donc invisibles avec l'ancienne approche
+      // "produit d'abord" qui ne regardait QUE les références déjà connues.
+      const corrByCode = {};
+      (typeof pdpGetActiveCorrespondances === 'function' ? pdpGetActiveCorrespondances() : []).forEach(r => {
+        corrByCode[r.code_client] = r;
+      });
+
+      (pcData.commandes||[]).forEach(c => {
+        const clientLabel = String(c.LIBFOU||c.CODCLI||'').trim() || 'Client non renseigné';
+        if (clientLabel !== cdeSelectedFinalClient) return;
+        const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
+        if (qteRest <= 0) return;
+        const code = String(c.REF_RTD||'').trim();
+        const corr = corrByCode[code]; // enrichissement si le produit est suivi, sinon on affiche quand même la ligne
+        rows.push({
+          numCmd:  String(c.NUM_COM||''),
+          client:  clientLabel,
+          codcli:  String(c.CODCLI||'').trim(),
+          ref:     code,
+          qteCde:  Number(c.QTE_CDE)||0,
+          qteLiv:  Number(c.QTE_LIVREE)||0,
+          qteRest,
+          datDem:  cdeToISODate(c.DATDEM),
+          datDel:  cdeToISODate(c.DATDEL),
+          libelle: corr ? corr.libelle_fg : (String(c.LIBELL||'').trim() || code),
+          codart_wip: corr ? corr.codart_wip : null,
+          code_client: corr ? corr.code_client : code,
+        });
+      });
+    } else {
+      refsForClient.forEach(r => {
+        const fg = cdeResolveToFG(r.codart_wip, r.code_client);
+        const cmds = cdeGetForRef(fg);
+        cmds.forEach(c => rows.push(Object.assign({}, c, {
+          libelle: r.libelle_fg,
+          codart_wip: r.codart_wip,
+          code_client: r.code_client,
+        })));
+      });
+    }
 
     rows.sort((a,b) => (a.datDel||'9999').localeCompare(b.datDel||'9999'));
 
