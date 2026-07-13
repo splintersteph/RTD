@@ -18,7 +18,7 @@
 // d'aujourd'hui — à remplir au fur et à mesure.
 // ═══════════════════════════════════════════════════════════
 
-const PULTRUSION_REFS_DEFAULT = [{"client": "3M", "code": "JTO3_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 35.12, "stockMezzMl": 15804, "stockRtdLots": 5.51, "stockRtdMl": 2478, "lotsAttente": 3, "lotsQuarantaine": 0, "limiteBasse": 11.14, "limiteHaute": 267.38, "mlParLot": 450, "consoLotsMois": 9.536}, {"client": "Maillefer", "code": "JTO_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 2.27, "stockMezzMl": 2043, "stockRtdLots": 4.42, "stockRtdMl": 3982, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.42, "limiteHaute": 10.16, "mlParLot": 900, "consoLotsMois": 0.439}, {"client": "DT / MATCHPOST", "code": "JTR_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M300", "stockMezzLots": 6.23, "stockMezzMl": 5610, "stockRtdLots": 1.24, "stockRtdMl": 1113, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 1.75, "limiteHaute": 41.91, "mlParLot": 900, "consoLotsMois": 1.813}, {"client": "GC", "code": "JAR_2.5", "fibre": "AR600TEX", "rowing": "", "resine": "BIS GMA SR239", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0, "stockRtdMl": 0, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": null, "limiteHaute": null, "mlParLot": 900, "consoLotsMois": 1.785}, {"client": "Tokuyamma/shofu", "code": "JAR_2.5", "fibre": "AR600TEX", "rowing": "", "resine": "BIS GMA SR239", "stockMezzLots": 7.19, "stockMezzMl": 6468, "stockRtdLots": 1.71, "stockRtdMl": 1539, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 2.52, "limiteHaute": 60.6, "mlParLot": 900, "consoLotsMois": 1.785}, {"client": "3M", "code": "JTO_XRO_3%", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 7.08, "stockMezzMl": 3186, "stockRtdLots": 1.85, "stockRtdMl": 834, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 2.35, "limiteHaute": 56.37, "mlParLot": 450, "consoLotsMois": 1.723}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_ROUGEØ3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.05, "stockMezzMl": 942, "stockRtdLots": 0.24, "stockRtdMl": 219, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.08, "limiteHaute": 1.95, "mlParLot": 500, "consoLotsMois": 0.042}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_BLEU_Ø3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.13, "stockMezzMl": 1020, "stockRtdLots": 0.49, "stockRtdMl": 441, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.47, "mlParLot": 500, "consoLotsMois": 0.035}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_JAUNEØ3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.1, "stockMezzMl": 990, "stockRtdLots": 0.33, "stockRtdMl": 300, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.05, "limiteHaute": 1.16, "mlParLot": 500, "consoLotsMois": 0.024}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_VERT_Ø3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 0.61, "stockMezzMl": 549, "stockRtdLots": 0.32, "stockRtdMl": 285, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.36, "mlParLot": 500, "consoLotsMois": 0.042}, {"client": "Macrolock", "code": "JTO_XRO", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.0, "stockMezzMl": 903, "stockRtdLots": 0.93, "stockRtdMl": 836, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.01, "limiteHaute": 0.14, "mlParLot": 900, "consoLotsMois": 0.156}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_ROUGE", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.16, "stockMezzMl": 1044, "stockRtdLots": 0.51, "stockRtdMl": 456, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.69, "limiteHaute": 16.62, "mlParLot": 900, "consoLotsMois": 0.754}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_NOIR", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.3, "stockRtdMl": 266, "lotsAttente": 2, "lotsQuarantaine": 0, "limiteBasse": 0.25, "limiteHaute": 6.04, "mlParLot": 900, "consoLotsMois": 0.271}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_JAUNE", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.8, "stockMezzMl": 1623, "stockRtdLots": 0.38, "stockRtdMl": 339, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.6, "limiteHaute": 14.45, "mlParLot": 900, "consoLotsMois": 0.528}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_BLEU", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.83, "stockRtdMl": 747, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.34, "limiteHaute": 8.13, "mlParLot": 900, "consoLotsMois": 0.327}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_VERT", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.55, "stockRtdMl": 1394, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.1, "limiteHaute": 2.35, "mlParLot": 900, "consoLotsMois": 0.097}, {"client": "Komet / ULTRADENT", "code": "JNT_XRO_2.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 2.04, "stockMezzMl": 1020, "stockRtdLots": 1.39, "stockRtdMl": 693, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 1.81, "limiteHaute": 43.43, "mlParLot": 500, "consoLotsMois": 1.682}, {"client": "Komet", "code": "JNT_XRO_3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.08, "stockRtdMl": 324, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.5, "limiteHaute": 11.89, "mlParLot": 300, "consoLotsMois": 0.463}, {"client": "Apol", "code": "JTO_ROUGE_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0.4, "stockMezzMl": 360, "stockRtdLots": 0.3, "stockRtdMl": 272, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.03, "limiteHaute": 0.62, "mlParLot": 900, "consoLotsMois": 0.036}, {"client": "Apol", "code": "JTO_BLEU_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.81, "stockRtdMl": 731, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.05, "limiteHaute": 1.31, "mlParLot": 900, "consoLotsMois": 0.036}, {"client": "Apol", "code": "JTO_JAUNE_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.34, "stockRtdMl": 1205, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.49, "mlParLot": 900, "consoLotsMois": 0.02}, {"client": "Maillefer", "code": "JTO_2.5_BLANC", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.62, "stockRtdMl": 558, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.33, "limiteHaute": 7.97, "mlParLot": 900, "consoLotsMois": 0.339}];
+const PULTRUSION_REFS_DEFAULT = [{"client": "3M", "code": "JTO3_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 35.12, "stockMezzMl": 15804, "stockRtdLots": 5.51, "stockRtdMl": 2478, "lotsAttente": 3, "lotsQuarantaine": 0, "limiteBasse": 11.14, "limiteHaute": 267.38, "mlParLot": 450, "consoLotsMois": 9.536, "historiqueMl": {"2021": 46331, "2022": 65100, "2023": 51572, "2024": 43269, "2025": 51207}}, {"client": "Maillefer", "code": "JTO_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 2.27, "stockMezzMl": 2043, "stockRtdLots": 4.42, "stockRtdMl": 3982, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.42, "limiteHaute": 10.16, "mlParLot": 900, "consoLotsMois": 0.439, "historiqueMl": {"2021": 6972, "2022": 5252, "2023": 4271, "2024": 3978, "2025": 3240}}, {"client": "DT / MATCHPOST", "code": "JTR_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M300", "stockMezzLots": 6.23, "stockMezzMl": 5610, "stockRtdLots": 1.24, "stockRtdMl": 1113, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 1.75, "limiteHaute": 41.91, "mlParLot": 900, "consoLotsMois": 1.813, "historiqueMl": {"2021": 18280, "2022": 19991, "2023": 17349, "2024": 17956, "2025": 24349}}, {"client": "GC", "code": "JAR_2.5", "fibre": "AR600TEX", "rowing": "", "resine": "BIS GMA SR239", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0, "stockRtdMl": 0, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": null, "limiteHaute": null, "mlParLot": 900, "consoLotsMois": 1.785, "historiqueMl": {"2021": 18519, "2022": 23741, "2023": 18399, "2024": 19288, "2025": 16447}}, {"client": "Tokuyamma/shofu", "code": "JAR_2.5", "fibre": "AR600TEX", "rowing": "", "resine": "BIS GMA SR239", "stockMezzLots": 7.19, "stockMezzMl": 6468, "stockRtdLots": 1.71, "stockRtdMl": 1539, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 2.52, "limiteHaute": 60.6, "mlParLot": 900, "consoLotsMois": 1.785, "historiqueMl": {"2021": 18519, "2022": 23741, "2023": 18399, "2024": 19288, "2025": 16447}}, {"client": "3M", "code": "JTO_XRO_3%", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 7.08, "stockMezzMl": 3186, "stockRtdLots": 1.85, "stockRtdMl": 834, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 2.35, "limiteHaute": 56.37, "mlParLot": 450, "consoLotsMois": 1.723, "historiqueMl": {"2021": 8969, "2022": 6394, "2023": 8234, "2024": 9274, "2025": 13649}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_ROUGEØ3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.05, "stockMezzMl": 942, "stockRtdLots": 0.24, "stockRtdMl": 219, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.08, "limiteHaute": 1.95, "mlParLot": 500, "consoLotsMois": 0.042, "historiqueMl": {"2021": 345, "2022": 345, "2023": 225, "2024": 48, "2025": 296}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_BLEU_Ø3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.13, "stockMezzMl": 1020, "stockRtdLots": 0.49, "stockRtdMl": 441, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.47, "mlParLot": 500, "consoLotsMois": 0.035, "historiqueMl": {"2021": 267, "2022": 0, "2023": 144, "2024": 495, "2025": 133}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_JAUNEØ3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.1, "stockMezzMl": 990, "stockRtdLots": 0.33, "stockRtdMl": 300, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.05, "limiteHaute": 1.16, "mlParLot": 500, "consoLotsMois": 0.024, "historiqueMl": {"2021": 124, "2022": 136, "2023": 180, "2024": 51, "2025": 216}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_VERT_Ø3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 0.61, "stockMezzMl": 549, "stockRtdLots": 0.32, "stockRtdMl": 285, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.36, "mlParLot": 500, "consoLotsMois": 0.042, "historiqueMl": {"2021": 0, "2022": 0, "2023": 0, "2024": 1107, "2025": 139}}, {"client": "Macrolock", "code": "JTO_XRO", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.0, "stockMezzMl": 903, "stockRtdLots": 0.93, "stockRtdMl": 836, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.01, "limiteHaute": 0.14, "mlParLot": 900, "consoLotsMois": 0.156, "historiqueMl": {"2021": 810, "2022": 132, "2023": 0, "2024": 1098, "2025": 6399}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_ROUGE", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.16, "stockMezzMl": 1044, "stockRtdLots": 0.51, "stockRtdMl": 456, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.69, "limiteHaute": 16.62, "mlParLot": 900, "consoLotsMois": 0.754, "historiqueMl": {"2021": 9908, "2022": 9334, "2023": 7310, "2024": 7533, "2025": 6615}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_NOIR", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.3, "stockRtdMl": 266, "lotsAttente": 2, "lotsQuarantaine": 0, "limiteBasse": 0.25, "limiteHaute": 6.04, "mlParLot": 900, "consoLotsMois": 0.271, "historiqueMl": {"2021": 3720, "2022": 2595, "2023": 2883, "2024": 2904, "2025": 2538}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_JAUNE", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.8, "stockMezzMl": 1623, "stockRtdLots": 0.38, "stockRtdMl": 339, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.6, "limiteHaute": 14.45, "mlParLot": 900, "consoLotsMois": 0.528, "historiqueMl": {"2021": 8272, "2022": 6828, "2023": 3929, "2024": 4511, "2025": 4981}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_BLEU", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.83, "stockRtdMl": 747, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.34, "limiteHaute": 8.13, "mlParLot": 900, "consoLotsMois": 0.327, "historiqueMl": {"2021": 4231, "2022": 5910, "2023": 2028, "2024": 2181, "2025": 3309}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_VERT", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.55, "stockRtdMl": 1394, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.1, "limiteHaute": 2.35, "mlParLot": 900, "consoLotsMois": 0.097, "historiqueMl": {"2021": 1392, "2022": 2548, "2023": 288, "2024": 432, "2025": 580}}, {"client": "Komet / ULTRADENT", "code": "JNT_XRO_2.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 2.04, "stockMezzMl": 1020, "stockRtdLots": 1.39, "stockRtdMl": 693, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 1.81, "limiteHaute": 43.43, "mlParLot": 500, "consoLotsMois": 1.682, "historiqueMl": {"2021": 13152, "2022": 8599, "2023": 10502, "2024": 9328, "2025": 8874}}, {"client": "Komet", "code": "JNT_XRO_3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.08, "stockRtdMl": 324, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.5, "limiteHaute": 11.89, "mlParLot": 300, "consoLotsMois": 0.463, "historiqueMl": {"2021": 2206, "2022": 1383, "2023": 2225, "2024": 1547, "2025": 967}}, {"client": "Apol", "code": "JTO_ROUGE_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0.4, "stockMezzMl": 360, "stockRtdLots": 0.3, "stockRtdMl": 272, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.03, "limiteHaute": 0.62, "mlParLot": 900, "consoLotsMois": 0.036, "historiqueMl": {"2021": 638, "2022": 288, "2023": 324, "2024": 141, "2025": 576}}, {"client": "Apol", "code": "JTO_BLEU_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.81, "stockRtdMl": 731, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.05, "limiteHaute": 1.31, "mlParLot": 900, "consoLotsMois": 0.036, "historiqueMl": {"2021": 680, "2022": 292, "2023": 349, "2024": 240, "2025": 378}}, {"client": "Apol", "code": "JTO_JAUNE_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.34, "stockRtdMl": 1205, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.49, "mlParLot": 900, "consoLotsMois": 0.02, "historiqueMl": {"2021": 340, "2022": 127, "2023": 329, "2024": 120, "2025": 162}}, {"client": "Maillefer", "code": "JTO_2.5_BLANC", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.62, "stockRtdMl": 558, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.33, "limiteHaute": 7.97, "mlParLot": 900, "consoLotsMois": 0.339, "historiqueMl": {"2021": 4977, "2022": 3149, "2023": 4811, "2024": 3717, "2025": 1656}}];
 
 // ── Calculs de base ─────────────────────────────────────────────────────────
 function pultTotalStock(ref) {
@@ -152,6 +152,99 @@ function pultSearch(val) {
   }, 200);
 }
 
+// ── Détail d'une référence (modale) ─────────────────────────────────────────
+function pultShowDetail(code) {
+  const refs = pultGetActiveRefs();
+  const r = refs.find(x => x.code === code);
+  if (!r) return;
+
+  const couverture = pultCouvertureMois(r);
+  const style = pultCouvertureStyle(couverture);
+  const stock = pultTotalStock(r);
+  const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
+  const ofsRef = pultOFs.filter(o => o.code === r.code);
+
+  // Historique annuel (en mètres) — en attendant un vrai forecast (voir note
+  // pultImportForecast plus haut), c'est la meilleure donnée disponible pour se
+  // projeter : elle vient directement du fichier de planning pultrusion fourni.
+  const hist = r.historiqueMl || {};
+  const annees = Object.keys(hist).filter(a => hist[a] !== null && hist[a] !== undefined);
+  const maxHist = Math.max(1, ...annees.map(a => hist[a]));
+  const histRows = annees.map(a => {
+    const v = hist[a];
+    const pct = Math.round(v / maxHist * 100);
+    return `<div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--text-faint);width:36px;flex-shrink:0">${a}</span>
+      <div style="flex:1;height:12px;background:var(--bg);border-radius:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${style.dot};border-radius:6px"></div>
+      </div>
+      <span style="font-size:11px;font-weight:600;width:70px;text-align:right;flex-shrink:0">${v.toLocaleString('fr')} m</span>
+    </div>`;
+  }).join('');
+
+  const kpi = (label, val) => `<div style="background:var(--bg);border-radius:var(--radius);padding:10px 12px">
+    <div style="font-size:9px;color:var(--text-faint);text-transform:uppercase">${label}</div>
+    <div style="font-size:16px;font-weight:700">${val}</div>
+  </div>`;
+
+  document.getElementById('modal').innerHTML = `
+    <div class="modal-header">
+      <h2>${r.code}<span style="font-size:12px;font-weight:500;margin-left:10px;padding:3px 10px;border-radius:20px;background:var(--bg);color:var(--text-muted)">${r.client}</span></h2>
+      <button class="close-btn" onclick="closeOverlay()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:14px">${composition}</div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div style="flex:1.3;background:${style.bg};border-radius:var(--radius);padding:12px 14px;text-align:center">
+          <div style="font-size:10px;color:${style.text};text-transform:uppercase;font-weight:600">Couverture</div>
+          <div style="font-size:22px;font-weight:700;color:${style.text}">${pultFmtMois(couverture)}</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:var(--radius);padding:12px 14px;text-align:center">
+          <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase">Stock total</div>
+          <div style="font-size:22px;font-weight:700">${stock.toLocaleString('fr',{maximumFractionDigits:1})}<span style="font-size:11px;color:var(--text-faint)"> lots</span></div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">Détail du stock</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        ${kpi('Mezzanine (lots)', r.stockMezzLots.toLocaleString('fr',{maximumFractionDigits:1}))}
+        ${kpi('Mezzanine (mètres)', r.stockMezzMl.toLocaleString('fr'))}
+        ${kpi('RTD disponible (lots)', r.stockRtdLots.toLocaleString('fr',{maximumFractionDigits:1}))}
+        ${kpi('RTD disponible (mètres)', r.stockRtdMl.toLocaleString('fr'))}
+        ${kpi('Lots en attente CTRL', r.lotsAttente.toLocaleString('fr',{maximumFractionDigits:1}))}
+        ${kpi('Lots en quarantaine', r.lotsQuarantaine.toLocaleString('fr',{maximumFractionDigits:1}))}
+      </div>
+
+      ${r.limiteBasse!==null ? `<div style="display:flex;gap:8px;margin-bottom:16px;font-size:11px;color:var(--text-muted)">
+        <span>Limite basse : <strong>${r.limiteBasse.toLocaleString('fr',{maximumFractionDigits:1})} lots</strong> (~1 mois de conso)</span>
+        ${r.limiteHaute!==null ? `<span>· Limite haute : <strong>${r.limiteHaute.toLocaleString('fr',{maximumFractionDigits:1})} lots</strong></span>` : ''}
+      </div>` : ''}
+
+      ${ofsRef.length ? `
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">OF(s) de pultrusion en cours</div>
+        <div style="margin-bottom:16px">${ofsRef.map(o => `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px">
+          <span><strong>${o.id}</strong> · ${o.qty.toLocaleString('fr')} lots</span>
+          <span style="color:var(--text-faint)">${o.dateDebut}${o.dateFin ? ' → '+o.dateFin : ''}</span>
+        </div>`).join('')}</div>
+      ` : ''}
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">
+        <i class="ti ti-chart-line" style="vertical-align:-2px;margin-right:4px"></i>Consommation annuelle (mètres)
+      </div>
+      ${histRows
+        ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">${histRows}</div>
+           <div style="font-size:10px;color:var(--text-faint)">Historique du fichier de planning pultrusion — sera remplacé par une vraie prévision une fois le forecast lié (bouton "Forecast" en haut de l'onglet).</div>`
+        : `<div style="font-size:11px;color:var(--text-faint);padding:12px;background:var(--bg);border-radius:var(--radius);text-align:center">Pas d'historique disponible pour cette référence.</div>`
+      }
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeOverlay()">Fermer</button>
+    </div>`;
+  document.getElementById('overlay').classList.add('open');
+}
+
+
 function renderPultrusionPage() {
   const el = document.getElementById('view-pultrusion');
   if (!el) return;
@@ -183,7 +276,7 @@ function renderPultrusionPage() {
     const style = pultCouvertureStyle(couverture);
     const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
     const ofsRef = pultOFs.filter(o => o.code === r.code);
-    return `<div style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid ${style.dot};border-radius:var(--radius);padding:14px">
+    return `<div onclick="pultShowDetail('${r.code.replace(/'/g,"\\'")}')" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid ${style.dot};border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseleave="this.style.boxShadow='none'">
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:700">${r.code}</div>
