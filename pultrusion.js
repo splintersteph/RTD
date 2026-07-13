@@ -50,7 +50,7 @@ function pultTenonsToMl(codart_wip, nbTenons) {
 // Zones à exclure du stock disponible de jonc — non-conforme / non classé /
 // échantillons R&D. Distincte de EMPL_EXCLUS (index.html, pour les tenons/FG) :
 // les zones de stockage des joncs bruts ne sont pas les mêmes.
-const PULT_EMPL_EXCLUS = ['NC', 'ECONC', 'UND', 'R&D'];
+const PULT_EMPL_INCLUS = ['BSBAS1', 'ECOSTK']; // liste blanche stricte, demandée par Stéphane le 13/07/2026
 
 // Stock RÉEL et actuel d'un jonc, calculé directement depuis pcData.stock (le
 // même fichier PTSTOCKSIMPLE utilisé partout ailleurs dans l'app) — PAS depuis
@@ -63,9 +63,26 @@ function pultGetLiveStock(code) {
   const rows = pcData.stock.filter(r => String(r.CODART||'').trim() === code);
   if (!rows.length) return null;
   const totalPieces = rows
-    .filter(r => !PULT_EMPL_EXCLUS.includes(String(r.EMPLAC||'').trim()))
+    .filter(r => PULT_EMPL_INCLUS.includes(String(r.EMPLAC||'').trim()))
     .reduce((s,r) => s + (Number(r.QTEEMP)||0), 0);
   return totalPieces; // en pièces/mètres de jonc — à convertir en lots via mlParLot si besoin
+}
+
+// Détail RÉEL par zone d'emplacement (ex: ECOSTK, BUSIN1...), pour affichage dans
+// la modale de détail. On ne sait pas avec certitude quelle zone correspond à
+// "Mezzanine" vs "RTD disponible" dans le fichier Excel d'origine — plutôt que
+// de deviner et risquer une mauvaise catégorisation, on affiche les vraies zones
+// telles quelles, en mètres. Retourne un tableau vide si pas de stock live.
+function pultGetLiveStockByZone(code) {
+  if (typeof pcData === 'undefined' || !pcData.stock || !pcData.stock.length) return [];
+  const rows = pcData.stock.filter(r => String(r.CODART||'').trim() === code
+    && PULT_EMPL_INCLUS.includes(String(r.EMPLAC||'').trim()));
+  const byZone = {};
+  rows.forEach(r => {
+    const z = String(r.EMPLAC||'').trim() || '(zone non renseignée)';
+    byZone[z] = (byZone[z]||0) + (Number(r.QTEEMP)||0);
+  });
+  return Object.entries(byZone).map(([zone, ml]) => ({zone, ml})).sort((a,b) => b.ml - a.ml);
 }
 
 function pultTotalStock(ref) {
@@ -225,6 +242,7 @@ function pultShowDetail(code) {
   const couverture = pultCouvertureMois(r);
   const style = pultCouvertureStyle(couverture);
   const stock = pultTotalStock(r);
+  const isLive = pultIsLiveStock(r);
   const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
   const ofsRef = pultOFs.filter(o => o.code === r.code);
 
@@ -270,15 +288,28 @@ function pultShowDetail(code) {
         </div>
       </div>
 
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">Détail du stock</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">
+        Détail du stock ${isLive ? '<span style="font-weight:400;color:#1D9E75"><i class="ti ti-refresh" style="font-size:11px;vertical-align:-1px"></i> en direct</span>' : '<span style="font-weight:400;color:var(--text-faint)">(photo figée du fichier d\'origine)</span>'}
+      </div>
+      ${isLive
+        ? (() => {
+            const zones = pultGetLiveStockByZone(r.code);
+            if (!zones.length) return `<div style="font-size:11px;color:var(--text-faint);padding:12px;background:var(--bg);border-radius:var(--radius);margin-bottom:16px;text-align:center">Aucun stock trouvé pour ce code dans l'import en cours.</div>`;
+            return `<div style="margin-bottom:16px">${zones.map(z =>
+              `<div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px">
+                <span>${z.zone}</span><span style="font-weight:700">${z.ml.toLocaleString('fr')} m</span>
+              </div>`
+            ).join('')}</div>`;
+          })()
+        : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
         ${kpi('Mezzanine (lots)', r.stockMezzLots.toLocaleString('fr',{maximumFractionDigits:1}))}
         ${kpi('Mezzanine (mètres)', r.stockMezzMl.toLocaleString('fr'))}
         ${kpi('RTD disponible (lots)', r.stockRtdLots.toLocaleString('fr',{maximumFractionDigits:1}))}
         ${kpi('RTD disponible (mètres)', r.stockRtdMl.toLocaleString('fr'))}
         ${kpi('Lots en attente CTRL', r.lotsAttente.toLocaleString('fr',{maximumFractionDigits:1}))}
         ${kpi('Lots en quarantaine', r.lotsQuarantaine.toLocaleString('fr',{maximumFractionDigits:1}))}
-      </div>
+      </div>`
+      }
 
       ${r.limiteBasse!==null ? `<div style="display:flex;gap:8px;margin-bottom:16px;font-size:11px;color:var(--text-muted)">
         <span>Limite basse : <strong>${r.limiteBasse.toLocaleString('fr',{maximumFractionDigits:1})} lots</strong> (~1 mois de conso)</span>
