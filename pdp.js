@@ -1089,6 +1089,22 @@ function pdpShowDetail(code_client) {
     + (ok?'\u2713 ':'\u2717 ')+solde.toLocaleString('fr')+' FG disponibles'+'</span>'
     + '</div>'
 
+    // Matière de pultrusion utilisée (si connue) — clic renvoie vers sa tuile
+    // dans l'onglet Pultrusion.
+    + (() => {
+        if (typeof pultGetJoncForTenon !== 'function') return '';
+        const jonc = pultGetJoncForTenon(ref.codart_wip);
+        if (!jonc || !jonc.matiere) return '';
+        return '<div onclick="closeOverlay(); if(typeof setView===\'function\')setView(\'pultrusion\'); if(typeof pultShowDetail===\'function\')pultShowDetail(\''+jonc.matiere.replace(/'/g,"\\'")+'\');" '
+          + 'style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);cursor:pointer;width:fit-content;padding:3px 10px;border-radius:20px;background:var(--bg)" '
+          + 'onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'var(--bg)\'" '
+          + 'title="Voir la tuile pultrusion de cette matière">'
+          + '<i class="ti ti-columns-2" style="font-size:12px"></i> Jonc : <strong>'+jonc.matiere+'</strong>'
+          + (jonc.tenonsParMl ? ' <span style="color:var(--text-faint)">('+jonc.tenonsParMl+' tenons/ML)</span>' : '')
+          + ' <i class="ti ti-arrow-right" style="font-size:11px;margin-left:2px"></i>'
+          + '</div>';
+      })()
+
     // KPIs
     + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
     + '<div style="flex:1;min-width:100px;background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center">'
