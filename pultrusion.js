@@ -200,6 +200,11 @@ function pultImportForecast() {
 
 // ── Rendu principal ──────────────────────────────────────────────────────────
 let pultSearchFilter = '';
+let pultSortField = 'couverture'; // 'couverture' | 'alpha' | 'conso'
+function pultSetSort(val) {
+  pultSortField = val;
+  renderPultrusionPage();
+}
 let _pultSearchTimer = null;
 function pultSearch(val) {
   pultSearchFilter = val;
@@ -318,14 +323,36 @@ function renderPultrusionPage() {
     );
   }
 
-  const withCouverture = refs.map(r => ({ r, couverture: pultCouvertureMois(r), stock: pultTotalStock(r) }));
-  withCouverture.sort((a,b) => {
-    const na = a.couverture===null, nb = b.couverture===null;
-    if (na && nb) return 0;
-    if (na) return 1;
-    if (nb) return -1;
-    return a.couverture - b.couverture;
-  });
+  // Consommation la plus récente disponible dans l'historique (ex: 2025), utilisée
+  // pour le tri "plus consommé".
+  function pultDerniereConso(r) {
+    const hist = r.historiqueMl || {};
+    const annees = Object.keys(hist).filter(a => hist[a] !== null && hist[a] !== undefined).sort();
+    if (!annees.length) return null;
+    return hist[annees[annees.length - 1]];
+  }
+
+  const withCouverture = refs.map(r => ({ r, couverture: pultCouvertureMois(r), stock: pultTotalStock(r), conso: pultDerniereConso(r) }));
+
+  if (pultSortField === 'alpha') {
+    withCouverture.sort((a,b) => a.r.code.localeCompare(b.r.code));
+  } else if (pultSortField === 'conso') {
+    withCouverture.sort((a,b) => {
+      const na = a.conso===null, nb = b.conso===null;
+      if (na && nb) return 0;
+      if (na) return 1;
+      if (nb) return -1;
+      return b.conso - a.conso; // plus consommé d'abord
+    });
+  } else {
+    withCouverture.sort((a,b) => {
+      const na = a.couverture===null, nb = b.couverture===null;
+      if (na && nb) return 0;
+      if (na) return 1;
+      if (nb) return -1;
+      return a.couverture - b.couverture;
+    });
+  }
 
   const nbCritique = withCouverture.filter(x => x.couverture !== null && x.couverture < 1).length;
   const nbSurveiller = withCouverture.filter(x => x.couverture !== null && x.couverture >= 1 && x.couverture < 3).length;
@@ -381,6 +408,11 @@ function renderPultrusionPage() {
     + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
     + '<h2 style="font-size:17px;font-weight:600"><i class="ti ti-columns-2" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Pultrusion</h2>'
     + '<input id="pult-search" placeholder="Filtrer (référence, client, fibre)…" value="'+pultSearchFilter+'" oninput="pultSearch(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:240px">'
+    + '<select onchange="pultSetSort(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none">'
+    + '<option value="couverture"'+(pultSortField==='couverture'?' selected':'')+'>Trier : couverture (critique d\'abord)</option>'
+    + '<option value="alpha"'+(pultSortField==='alpha'?' selected':'')+'>Trier : alphabétique</option>'
+    + '<option value="conso"'+(pultSortField==='conso'?' selected':'')+'>Trier : plus consommé</option>'
+    + '</select>'
     + '<div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center">'
     + (nbCritique ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FCEBEB;color:#A32D2D"><i class="ti ti-alert-circle" style="vertical-align:-2px;margin-right:4px"></i>${nbCritique} &lt; 1 mois</span>` : '')
     + (nbSurveiller ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FEF5E7;color:#633806"><i class="ti ti-clock" style="vertical-align:-2px;margin-right:4px"></i>${nbSurveiller} &lt; 3 mois</span>` : '')
