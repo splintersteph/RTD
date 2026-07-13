@@ -47,8 +47,41 @@ function pultTenonsToMl(codart_wip, nbTenons) {
   return nbTenons / t.tenonsParMl;
 }
 
+// Zones à exclure du stock disponible de jonc — non-conforme / non classé /
+// échantillons R&D. Distincte de EMPL_EXCLUS (index.html, pour les tenons/FG) :
+// les zones de stockage des joncs bruts ne sont pas les mêmes.
+const PULT_EMPL_EXCLUS = ['NC', 'ECONC', 'UND', 'R&D'];
+
+// Stock RÉEL et actuel d'un jonc, calculé directement depuis pcData.stock (le
+// même fichier PTSTOCKSIMPLE utilisé partout ailleurs dans l'app) — PAS depuis
+// la photo figée du fichier Excel de pultrusion d'origine, qui se périme dès
+// qu'un nouveau stock est importé. Retourne null si pcData n'est pas disponible
+// ou si ce code n'y apparaît pas du tout (référence pas encore suivie dans cet
+// export) — dans ce cas, on retombe sur les chiffres figés (voir pultTotalStock).
+function pultGetLiveStock(code) {
+  if (typeof pcData === 'undefined' || !pcData.stock || !pcData.stock.length) return null;
+  const rows = pcData.stock.filter(r => String(r.CODART||'').trim() === code);
+  if (!rows.length) return null;
+  const totalPieces = rows
+    .filter(r => !PULT_EMPL_EXCLUS.includes(String(r.EMPLAC||'').trim()))
+    .reduce((s,r) => s + (Number(r.QTEEMP)||0), 0);
+  return totalPieces; // en pièces/mètres de jonc — à convertir en lots via mlParLot si besoin
+}
+
 function pultTotalStock(ref) {
+  const liveMl = pultGetLiveStock(ref.code);
+  if (liveMl !== null && ref.mlParLot) {
+    return liveMl / ref.mlParLot; // stock réel actuel, converti en lots
+  }
+  // Repli : photo figée de l'export Excel d'origine (référence pas encore
+  // présente dans le stock importé cette session, ou aucun stock importé du tout)
   return (ref.stockMezzLots||0) + (ref.stockRtdLots||0) + (ref.lotsAttente||0);
+}
+
+// true si le stock affiché est calculé en direct depuis pcData.stock (fiable,
+// à jour), false s'il s'agit du repli sur la photo figée du fichier d'origine.
+function pultIsLiveStock(ref) {
+  return pultGetLiveStock(ref.code) !== null && !!ref.mlParLot;
 }
 
 // Couverture en mois = stock total ÷ limite basse (déjà "1 mois de conso" dans
@@ -302,10 +335,11 @@ function renderPultrusionPage() {
     const style = pultCouvertureStyle(couverture);
     const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
     const ofsRef = pultOFs.filter(o => o.code === r.code);
+    const isLive = pultIsLiveStock(r);
     return `<div onclick="pultShowDetail('${r.code.replace(/'/g,"\\'")}')" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid ${style.dot};border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseleave="this.style.boxShadow='none'">
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700">${r.code}</div>
+          <div style="font-size:14px;font-weight:700">${r.code}${isLive ? ' <i class="ti ti-refresh" style="font-size:10px;color:#1D9E75;vertical-align:2px" title="Stock en direct depuis le fichier importé"></i>' : ' <i class="ti ti-clock-pause" style="font-size:10px;color:var(--text-faint);vertical-align:2px" title="Photo figée — importe un stock à jour pour un chiffre en direct"></i>'}</div>
           <div style="font-size:10px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${composition}">${composition}</div>
         </div>
         <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:${style.bg};color:${style.text};flex-shrink:0">${pultFmtMois(couverture)}</span>
