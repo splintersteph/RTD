@@ -101,38 +101,41 @@ function pultImportFile(input) {
   reader.readAsArrayBuffer(file);
 }
 
-// ── Planning hebdomadaire (session uniquement — voir note en tête de fichier) ──
-// Clé : "codeRef_YYYY-Www" -> nombre de jours de production planifiés.
-let pultPlanning = {};
-let pultWeekOffset = 0; // décalage (en semaines) par rapport à la semaine actuelle, pour naviguer
+// ── OFs de pultrusion en cours ──────────────────────────────────────────────
+// Simple suivi (session uniquement — voir note en tête de fichier, même
+// limitation que les autres imports de l'app) : un OF de pultrusion représente
+// un passage machine en cours sur une référence donnée, sans les étapes
+// multiples du Kanban tenon/blister/FG — la pultrusion est un process continu.
+let pultOFs = [];
+let _pultOfId = 1;
 
-function pultGetISOWeek(d) {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-  return { year: date.getUTCFullYear(), week };
-}
-
-function pultWeekKey(baseDate, offsetWeeks) {
-  const d = new Date(baseDate);
-  d.setDate(d.getDate() + offsetWeeks * 7);
-  const { year, week } = pultGetISOWeek(d);
-  return year + '-W' + String(week).padStart(2, '0');
-}
-
-function pultNavWeeks(delta) {
-  pultWeekOffset += delta;
+function pultAddOF() {
+  const code = document.getElementById('pult-of-ref')?.value;
+  const qty = parseFloat(document.getElementById('pult-of-qty')?.value);
+  const dateFin = document.getElementById('pult-of-datefin')?.value || null;
+  if (!code || !qty || qty <= 0) {
+    if (typeof showToast === 'function') showToast('Référence et quantité (en lots) obligatoires.');
+    return;
+  }
+  pultOFs.push({ id: 'PLT-' + (_pultOfId++), code, qty, dateDebut: new Date().toISOString().slice(0,10), dateFin });
+  const qtyInp = document.getElementById('pult-of-qty');
+  if (qtyInp) qtyInp.value = '';
   renderPultrusionPage();
 }
 
-function pultSetPlanning(code, weekKey, value) {
-  const key = code + '_' + weekKey;
-  const n = parseInt(value);
-  if (!n || n <= 0) delete pultPlanning[key];
-  else pultPlanning[key] = n;
+function pultDeleteOF(id) {
+  pultOFs = pultOFs.filter(o => o.id !== id);
   renderPultrusionPage();
+}
+
+// ── Import futur de fichiers de forecast (à venir) ──────────────────────────
+// Prévu : lier un ou plusieurs fichiers de prévision de vente/commande par
+// client pour estimer la consommation annuelle de chaque référence de jonc, et
+// comparer au stock/à la capacité de pultrusion disponible. Pas encore
+// implémenté — en attente des fichiers de forecast réels pour connaître leur
+// structure exacte, comme pour tous les autres imports de cette app.
+function pultImportForecast() {
+  if (typeof showToast === 'function') showToast('Import de forecast : bientôt disponible — envoie un exemple de fichier pour que ce soit branché.');
 }
 
 
@@ -179,6 +182,7 @@ function renderPultrusionPage() {
   const cardsHtml = withCouverture.map(({r, couverture, stock}) => {
     const style = pultCouvertureStyle(couverture);
     const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
+    const ofsRef = pultOFs.filter(o => o.code === r.code);
     return `<div style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid ${style.dot};border-radius:var(--radius);padding:14px">
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
@@ -200,35 +204,25 @@ function renderPultrusionPage() {
       </div>
       ${r.lotsAttente > 0 ? `<div style="margin-top:6px;font-size:10px;color:var(--text-muted)"><i class="ti ti-clock" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${r.lotsAttente.toLocaleString('fr',{maximumFractionDigits:1})} lot(s) en attente de contrôle</div>` : ''}
       ${r.limiteBasse!==null && stock < r.limiteBasse ? `<div style="margin-top:6px;font-size:10px;font-weight:600;color:#A32D2D"><i class="ti ti-alert-triangle" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Sous la limite basse (${r.limiteBasse.toLocaleString('fr',{maximumFractionDigits:1})})</div>` : ''}
+      ${ofsRef.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px">${ofsRef.map(o => `<span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;background:#FFF4E6;color:#92400E">${o.id} · ${o.qty}L</span>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
 
-  // ── Planning hebdomadaire : fenêtre de 10 semaines glissantes ──────────────
-  const today = new Date(); today.setHours(0,0,0,0);
-  const NB_SEM = 10;
-  const weekCols = [];
-  for (let i = 0; i < NB_SEM; i++) {
-    const offset = pultWeekOffset + i;
-    const d = new Date(today); d.setDate(d.getDate() + offset*7);
-    const { year, week } = pultGetISOWeek(d);
-    weekCols.push({ key: pultWeekKey(today, offset), label: 'S' + week, isCurrent: offset === 0 });
-  }
-
-  const planningRows = refs.map(r => {
-    const cells = weekCols.map(w => {
-      const key = r.code + '_' + w.key;
-      const val = pultPlanning[key] || '';
-      return `<td style="padding:2px;text-align:center;${w.isCurrent?'background:var(--accent-light)':''}">
-        <input type="number" min="0" max="5" value="${val}" placeholder="—" onchange="pultSetPlanning('${r.code.replace(/'/g,"\\'")}','${w.key}',this.value)"
-          style="width:34px;padding:4px 2px;text-align:center;border:1px solid var(--border-med);border-radius:4px;background:var(--bg);color:var(--text);font-size:11px;font-family:var(--font);outline:none">
-      </td>`;
-    }).join('');
-    return `<tr><td style="font-size:11px;font-weight:600;white-space:nowrap;padding-right:10px">${r.code}<div style="font-size:9px;color:var(--text-faint);font-weight:400">${r.client}</div></td>${cells}</tr>`;
-  }).join('');
-
-  const weekHeaderHtml = weekCols.map(w =>
-    `<th style="text-align:center;font-size:10px;${w.isCurrent?'color:var(--accent);font-weight:700':''}">${w.label}</th>`
-  ).join('');
+  // ── OFs de pultrusion en cours ──────────────────────────────────────────
+  const refOptions = refs.map(r => `<option value="${r.code}">${r.code} — ${r.client}</option>`).join('');
+  const ofsRowsHtml = pultOFs.length
+    ? pultOFs.map(o => {
+        const ref = refs.find(r => r.code === o.code);
+        return `<tr>
+          <td style="font-size:11px;font-weight:700;color:var(--accent)">${o.id}</td>
+          <td style="font-size:12px">${o.code}<div style="font-size:9px;color:var(--text-faint)">${ref ? ref.client : ''}</div></td>
+          <td style="text-align:right;font-size:12px">${o.qty.toLocaleString('fr')} lots</td>
+          <td style="font-size:11px;color:var(--text-muted)">${o.dateDebut}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${o.dateFin || '—'}</td>
+          <td style="text-align:right"><button onclick="pultDeleteOF('${o.id}')" style="background:none;border:none;cursor:pointer;color:#A32D2D;opacity:.7;padding:4px"><i class="ti ti-trash" style="font-size:13px"></i></button></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-faint)">Aucun OF de pultrusion en cours</td></tr>';
 
   let html = '<div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">'
     + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
@@ -237,6 +231,7 @@ function renderPultrusionPage() {
     + '<div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center">'
     + (nbCritique ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FCEBEB;color:#A32D2D"><i class="ti ti-alert-circle" style="vertical-align:-2px;margin-right:4px"></i>${nbCritique} &lt; 1 mois</span>` : '')
     + (nbSurveiller ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FEF5E7;color:#633806"><i class="ti ti-clock" style="vertical-align:-2px;margin-right:4px"></i>${nbSurveiller} &lt; 3 mois</span>` : '')
+    + '<button class="btn" onclick="pultImportForecast()" style="font-size:11px;padding:5px 12px"><i class="ti ti-chart-line"></i> Forecast (bientôt)</button>'
     + '<label class="btn" style="font-size:11px;padding:5px 12px;cursor:pointer"><i class="ti ti-upload"></i> Importer<input type="file" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="pultImportFile(this)"></label>'
     + '</div></div>';
 
@@ -245,19 +240,21 @@ function renderPultrusionPage() {
   html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px">Stock de joncs ('+refs.length+' références)</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:24px">' + (cardsHtml || '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-faint)">Aucune référence</div>') + '</div>';
 
-  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
-    + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">Planning hebdomadaire (jours de prod)</div>'
-    + '<button class="btn" onclick="pultNavWeeks(-'+NB_SEM+')" style="font-size:11px;padding:3px 8px"><i class="ti ti-chevron-left"></i></button>'
-    + '<button class="btn" onclick="pultWeekOffset=0;renderPultrusionPage()" style="font-size:11px;padding:3px 8px">Aujourd\'hui</button>'
-    + '<button class="btn" onclick="pultNavWeeks('+NB_SEM+')" style="font-size:11px;padding:3px 8px"><i class="ti ti-chevron-right"></i></button>'
-    + '<span style="font-size:10px;color:var(--text-faint)">Saisie manuelle (0 à 5 jours/semaine) — conservée pendant la session</span>'
+  html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px">OF(s) de pultrusion en cours</div>';
+
+  html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+    + '<div style="flex:2;min-width:180px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Référence</div>'
+    + '<select id="pult-of-ref" style="width:100%;padding:7px 8px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font)"><option value="">Choisir…</option>'+refOptions+'</select></div>'
+    + '<div style="flex:1;min-width:90px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Qté (lots)</div>'
+    + '<input id="pult-of-qty" type="number" min="0.1" step="0.1" placeholder="ex: 5" style="width:100%;padding:7px 8px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font)"></div>'
+    + '<div style="flex:1;min-width:130px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Fin prévue</div>'
+    + '<input id="pult-of-datefin" type="date" style="width:100%;padding:7px 8px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font)"></div>'
+    + '<button class="btn btn-primary" onclick="pultAddOF()" style="font-size:12px;padding:8px 14px"><i class="ti ti-plus"></i> Nouvel OF</button>'
     + '</div>';
 
   html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto">'
-    + '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;font-size:10px;color:var(--text-faint);padding-right:10px">Référence</th>'
-    + weekHeaderHtml + '</tr></thead><tbody>'
-    + (planningRows || '<tr><td colspan="'+(NB_SEM+1)+'" style="text-align:center;padding:20px;color:var(--text-faint)">Aucune référence</td></tr>')
-    + '</tbody></table></div>';
+    + '<table class="cat-table" style="width:100%"><thead><tr><th>N° OF</th><th>Référence</th><th style="text-align:right">Quantité</th><th>Début</th><th>Fin prévue</th><th></th></tr></thead>'
+    + '<tbody>' + ofsRowsHtml + '</tbody></table></div>';
 
   html += '</div></div>';
   el.innerHTML = html;
