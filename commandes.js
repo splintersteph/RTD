@@ -44,6 +44,7 @@ function cdeGetAllOpenLines() {
       client: String(c.LIBFOU||c.CODCLI||'').trim() || 'Client non renseigné',
       ref: code,
       libelle: corr ? corr.libelle_fg : (String(c.LIBELL||'').trim() || code),
+      codart_wip: corr ? corr.codart_wip : null,
       code_client: corr ? corr.code_client : code,
       qteCde: Number(c.QTE_CDE)||0,
       qteLiv: Number(c.QTE_LIVREE)||0,
@@ -472,34 +473,48 @@ function renderCommandesPage() {
     }
     lines.sort((a,b) => (a.datDel||'9999').localeCompare(b.datDel||'9999'));
 
+    // Rendre ces lignes disponibles à cdeShowOrderDetail (qui filtre par numCmd
+    // dans _cdeCurrentRows, quelle que soit la vue depuis laquelle on l'ouvre).
+    _cdeCurrentRows = lines;
+
+    // Regroupement par commande : une ligne par N° Cde, la date/le client pris
+    // sur sa première ligne (une commande n'a qu'un client et une date de
+    // livraison prévue, même si elle contient plusieurs références).
+    const byCmd = {};
+    const cmdOrder = [];
+    lines.forEach(l => {
+      if (!byCmd[l.numCmd]) { byCmd[l.numCmd] = []; cmdOrder.push(l.numCmd); }
+      byCmd[l.numCmd].push(l);
+    });
+
     const totalRestant = lines.reduce((s,l) => s+l.qteRest, 0);
     const today = new Date().toISOString().slice(0,10);
 
-    const rowsHtml = lines.length ? lines.map(l => {
-      const isLate = l.datDel && l.datDel < today;
-      return `<tr onclick="${typeof pdpShowDetail==='function' && l.code_client ? "pdpShowDetail('"+l.code_client+"')" : ''}" style="cursor:${l.code_client?'pointer':'default'}">
-        <td style="font-size:12px;font-weight:600;color:${isLate?'#A32D2D':'var(--text)'}">${l.datDel ? cdeFmtDate(l.datDel) : '—'}${isLate?' <i class="ti ti-alert-triangle" style="font-size:11px;vertical-align:-1px" title="Livraison dépassée"></i>':''}</td>
-        <td style="font-size:11px;font-weight:700;color:var(--accent)">${l.numCmd}</td>
-        <td style="font-size:12px">${l.client}</td>
-        <td style="font-size:12px">${l.libelle}<div style="font-size:9px;color:var(--text-faint);font-family:monospace">${l.ref}</div></td>
-        <td style="text-align:right;font-size:12px">${l.qteCde.toLocaleString('fr')}</td>
-        <td style="text-align:right;font-size:12px;color:var(--text-muted)">${l.qteLiv.toLocaleString('fr')}</td>
-        <td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">${l.qteRest.toLocaleString('fr')}</span></td>
+    const rowsHtml = cmdOrder.length ? cmdOrder.map(numCmd => {
+      const grp = byCmd[numCmd];
+      const first = grp[0];
+      const restantCmd = grp.reduce((s,l) => s+l.qteRest, 0);
+      const isLate = first.datDel && first.datDel < today;
+      return `<tr onclick="cdeShowOrderDetail('${numCmd}')" style="cursor:pointer">
+        <td style="font-size:12px;font-weight:600;color:${isLate?'#A32D2D':'var(--text)'}">${first.datDel ? cdeFmtDate(first.datDel) : '—'}${isLate?' <i class="ti ti-alert-triangle" style="font-size:11px;vertical-align:-1px" title="Livraison dépassée"></i>':''}</td>
+        <td style="font-size:11px;font-weight:700;color:var(--accent)">${numCmd}</td>
+        <td style="font-size:12px">${first.client}</td>
+        <td style="text-align:right;font-size:12px">${grp.length}</td>
+        <td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">${restantCmd.toLocaleString('fr')}</span></td>
       </tr>`;
-    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune commande ouverte</td></tr>';
+    }).join('') : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune commande ouverte</td></tr>';
 
     const html = '<div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">'
       + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
       + '<h2 style="font-size:17px;font-weight:600">Commandes</h2>'
       + modeToggle
       + '<input id="cde-chrono-search" placeholder="Filtrer (référence, n° commande, client)…" value="'+cdeChronoSearch+'" oninput="cdeChronoSetSearch(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:260px">'
-      + '<span style="margin-left:auto;font-size:12px;color:var(--text-muted)">'+lines.length+' ligne(s) · <strong style="color:#A32D2D">'+totalRestant.toLocaleString('fr')+'</strong> pièces restantes</span>'
+      + '<span style="margin-left:auto;font-size:12px;color:var(--text-muted)">'+cmdOrder.length+' commande(s) · '+lines.length+' ligne(s) · <strong style="color:#A32D2D">'+totalRestant.toLocaleString('fr')+'</strong> pièces restantes</span>'
       + '</div>'
       + '<div style="flex:1;overflow-y:auto;padding:16px 20px">'
       + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto">'
       + '<table class="cat-table" style="width:100%"><thead><tr>'
-      + '<th>Livraison</th><th>N° Cde</th><th>Client</th><th>Référence</th>'
-      + '<th style="text-align:right">Cdé</th><th style="text-align:right">Livré</th><th style="text-align:right">Restant</th>'
+      + '<th>Livraison</th><th>N° Cde</th><th>Client</th><th style="text-align:right">Lignes</th><th style="text-align:right">Restant</th>'
       + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div></div>';
 
     el.innerHTML = html;
