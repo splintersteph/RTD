@@ -274,6 +274,7 @@ function pultImportFile(input) {
         pultRefsImported = refs;
         if (typeof showToast === 'function') showToast(`Pultrusion : ${refs.length} références importées`);
         if (typeof currentView !== 'undefined' && currentView === 'pultrusion' && typeof renderPultrusionPage === 'function') renderPultrusionPage();
+        if (typeof scheduleSave === 'function') scheduleSave();
       } catch (err) {
         console.error(err);
         if (typeof showToast === 'function') showToast('Erreur import pultrusion : ' + err.message);
@@ -305,11 +306,13 @@ function pultAddOF() {
   const qtyInp = document.getElementById('pult-of-qty');
   if (qtyInp) qtyInp.value = '';
   renderPultrusionPage();
+  if (typeof scheduleSave === 'function') scheduleSave();
 }
 
 function pultDeleteOF(id) {
   pultOFs = pultOFs.filter(o => o.id !== id);
   renderPultrusionPage();
+  if (typeof scheduleSave === 'function') scheduleSave();
 }
 
 // ── Import d'un fichier de forecast ─────────────────────────────────────────
@@ -405,6 +408,7 @@ function pultImportForecast(input) {
         pultForecastImported = result;
         if (typeof showToast === 'function') showToast(`Forecast importé : ${nbRefs} références (${result.year})`);
         if (typeof currentView !== 'undefined' && currentView === 'pultrusion' && typeof renderPultrusionPage === 'function') renderPultrusionPage();
+        if (typeof scheduleSave === 'function') scheduleSave();
       } catch (err) {
         console.error(err);
         if (typeof showToast === 'function') showToast('Erreur import forecast : ' + err.message);

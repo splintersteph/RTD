@@ -563,6 +563,10 @@ async function loadData() {
     objectifs3m=d.objectifs_3m||{};
     machines=d.machines||initMachines();
     if(d.durees_etapes){Object.assign(DUREES_ETAPES,d.durees_etapes);Object.assign(parametres.durees,d.durees_etapes);}
+    if(d.pc_data && typeof pcData!=='undefined'){
+      pcData = Object.assign({stock:[],commandes:[],ofEnCours:[],lastImport:{}}, d.pc_data, {ofEnCours:[]});
+    }
+    if(d.extra_data) window._extraDataToRestore = d.extra_data;
     const ids=new Set(ofs.map(o=>o.id)); archives=archives.filter(a=>!ids.has(a.id));
     serverAvailable=true; setSaveStatus('saved','Synchronisé');
   } catch(e) {
@@ -577,10 +581,25 @@ function scheduleSave() {
   clearTimeout(saveTimeout); setSaveStatus('saving','Sauvegarde…');
   saveTimeout = setTimeout(async()=>{
     try {
+      // pcData sans ofEnCours (exclu à la demande de Stéphane : l'import "OF en
+      // cours" ERP ne doit pas survivre à la sauvegarde, contrairement à stock et
+      // commandes).
+      const pcDataToSave = (typeof pcData!=='undefined') ? Object.assign({}, pcData, {ofEnCours:[]}) : undefined;
       const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({ofs,archives,nextId,catalogue,objectifs_3m:objectifs3m,machines,durees_etapes:DUREES_ETAPES,
-          pdp_prefs:{names:typeof pdpCustomNames!=='undefined'?pdpCustomNames:{},order:typeof pdpCustomOrder!=='undefined'?pdpCustomOrder:{},deleted:typeof pdpDeletedRefs!=='undefined'?pdpDeletedRefs:[]}}),
-        signal:AbortSignal.timeout(5000)});
+          pdp_prefs:{names:typeof pdpCustomNames!=='undefined'?pdpCustomNames:{},order:typeof pdpCustomOrder!=='undefined'?pdpCustomOrder:{},deleted:typeof pdpDeletedRefs!=='undefined'?pdpDeletedRefs:[]},
+          pc_data:pcDataToSave,
+          extra_data:{
+            pdpImportedCorrespondances: typeof pdpImportedCorrespondances!=='undefined'?pdpImportedCorrespondances:null,
+            nomenclatures: typeof nomenclatures!=='undefined'?nomenclatures:null,
+            consoImported: typeof consoImported!=='undefined'?consoImported:null,
+            consoImportedPeriodDays: typeof consoImportedPeriodDays!=='undefined'?consoImportedPeriodDays:null,
+            consoImportedAsOf: typeof consoImportedAsOf!=='undefined'?consoImportedAsOf:null,
+            pultRefsImported: typeof pultRefsImported!=='undefined'?pultRefsImported:null,
+            pultForecastImported: typeof pultForecastImported!=='undefined'?pultForecastImported:null,
+            pultOFs: typeof pultOFs!=='undefined'?pultOFs:[],
+          }}),
+        signal:AbortSignal.timeout(10000)});
       if (!res.ok) throw new Error();
       setSaveStatus('saved','Sauvegardé');
       setTimeout(()=>setSaveStatus('saved','Synchronisé'),2000);
@@ -603,6 +622,22 @@ setInterval(async()=>{
       });
     }
     objectifs3m=d.objectifs_3m||objectifs3m;
+    if(d.pc_data && typeof pcData!=='undefined'){
+      pcData = Object.assign({stock:[],commandes:[],ofEnCours:[],lastImport:{}}, d.pc_data, {ofEnCours:[]});
+    }
+    if(d.extra_data){
+      const ex = d.extra_data;
+      if(ex.pdpImportedCorrespondances && typeof pdpImportedCorrespondances!=='undefined') pdpImportedCorrespondances=ex.pdpImportedCorrespondances;
+      if(ex.nomenclatures && typeof nomenclatures!=='undefined'){ nomenclatures.length=0; ex.nomenclatures.forEach(n=>nomenclatures.push(n)); }
+      if(typeof consoImported!=='undefined'){
+        if(ex.consoImported!==null && ex.consoImported!==undefined) consoImported=ex.consoImported;
+        if(ex.consoImportedPeriodDays!==null && ex.consoImportedPeriodDays!==undefined) consoImportedPeriodDays=ex.consoImportedPeriodDays;
+        if(ex.consoImportedAsOf!==null && ex.consoImportedAsOf!==undefined) consoImportedAsOf=ex.consoImportedAsOf;
+      }
+      if(ex.pultRefsImported && typeof pultRefsImported!=='undefined') pultRefsImported=ex.pultRefsImported;
+      if(ex.pultForecastImported && typeof pultForecastImported!=='undefined') pultForecastImported=ex.pultForecastImported;
+      if(ex.pultOFs && typeof pultOFs!=='undefined') pultOFs=ex.pultOFs;
+    }
     // Ne pas perturber la vue en cours — juste mettre à jour les compteurs
     renderStats();buildSidebar();renderAlertBanner();
     // Re-render la vue seulement si ce n'est pas une sous-vue sensible
@@ -3259,6 +3294,7 @@ function pcImport(type, input) {
     if (type === 'stock')     { pcData.stock = rows;       pcData.lastImport.stock = today; }
     if (type === 'commandes') { pcData.commandes = rows;   pcData.lastImport.commandes = today; }
     showToast('✓ ' + rows.length + ' lignes importées');
+    scheduleSave(); // pousse pcData sur le serveur pour qu'il survive au prochain rechargement
     if (currentView === 'stock') renderStockPage();
     if (currentView === 'planning') renderPlanningComposite();
     input.value = '';
@@ -4130,6 +4166,24 @@ if (window._pdpPrefsToRestore) {
     p.deleted.forEach(r => { if (!pdpDeletedRefs.includes(r)) pdpDeletedRefs.push(r); });
   }
   delete window._pdpPrefsToRestore;
+}
+// Restaurer les autres imports (correspondances, nomenclatures, consommation,
+// pultrusion, forecast, OF de pultrusion) maintenant que tous les modules sont
+// chargés — voir loadData() dans le script principal, qui les avait mis de côté
+// dans window._extraDataToRestore le temps que ces scripts arrivent.
+if (window._extraDataToRestore) {
+  const ex = window._extraDataToRestore;
+  if (ex.pdpImportedCorrespondances && typeof pdpImportedCorrespondances !== 'undefined') pdpImportedCorrespondances = ex.pdpImportedCorrespondances;
+  if (ex.nomenclatures && typeof nomenclatures !== 'undefined') { nomenclatures.length = 0; ex.nomenclatures.forEach(n => nomenclatures.push(n)); }
+  if (typeof consoImported !== 'undefined') {
+    if (ex.consoImported !== null && ex.consoImported !== undefined) consoImported = ex.consoImported;
+    if (ex.consoImportedPeriodDays !== null && ex.consoImportedPeriodDays !== undefined) consoImportedPeriodDays = ex.consoImportedPeriodDays;
+    if (ex.consoImportedAsOf !== null && ex.consoImportedAsOf !== undefined) consoImportedAsOf = ex.consoImportedAsOf;
+  }
+  if (ex.pultRefsImported && typeof pultRefsImported !== 'undefined') pultRefsImported = ex.pultRefsImported;
+  if (ex.pultForecastImported && typeof pultForecastImported !== 'undefined') pultForecastImported = ex.pultForecastImported;
+  if (ex.pultOFs && typeof pultOFs !== 'undefined') pultOFs = ex.pultOFs;
+  delete window._extraDataToRestore;
 }
 // Re-render si on était sur une vue PDP/Stock pendant le chargement différé
 if (typeof currentView !== 'undefined' && (currentView === 'pdp' || currentView === 'stock')) {

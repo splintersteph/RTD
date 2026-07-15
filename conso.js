@@ -122,6 +122,7 @@ function consoImportFile(input) {
 
         if (typeof render === 'function') render();
         if (typeof currentView !== 'undefined' && currentView === 'conso' && typeof renderConsoPage === 'function') renderConsoPage();
+        if (typeof scheduleSave === 'function') scheduleSave();
       } catch (err) {
         console.error(err);
         if (typeof showToast === 'function') showToast('Erreur import ventes : ' + err.message);
