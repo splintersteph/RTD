@@ -31,6 +31,16 @@ const TENON_TO_JONC = [{"codart_wip": "TENON_W0_JTO", "matiere": "JTO3_2.5", "te
 
 const PULTRUSION_REFS_DEFAULT = [{"client": "3M", "code": "JTO3_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 35.12, "stockMezzMl": 15804, "stockRtdLots": 5.51, "stockRtdMl": 2478, "lotsAttente": 3, "lotsQuarantaine": 0, "limiteBasse": 11.14, "limiteHaute": 267.38, "mlParLot": 450, "consoLotsMois": 9.536, "historiqueMl": {"2021": 46331, "2022": 65100, "2023": 51572, "2024": 43269, "2025": 51207}}, {"client": "Maillefer", "code": "JTO_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 2.27, "stockMezzMl": 2043, "stockRtdLots": 4.42, "stockRtdMl": 3982, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.42, "limiteHaute": 10.16, "mlParLot": 900, "consoLotsMois": 0.439, "historiqueMl": {"2021": 6972, "2022": 5252, "2023": 4271, "2024": 3978, "2025": 3240}}, {"client": "DT / MATCHPOST", "code": "JTR_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M300", "stockMezzLots": 6.23, "stockMezzMl": 5610, "stockRtdLots": 1.24, "stockRtdMl": 1113, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 1.75, "limiteHaute": 41.91, "mlParLot": 900, "consoLotsMois": 1.813, "historiqueMl": {"2021": 18280, "2022": 19991, "2023": 17349, "2024": 17956, "2025": 24349}}, {"client": "GC", "code": "JAR_2.5", "fibre": "AR600TEX", "rowing": "", "resine": "BIS GMA SR239", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0, "stockRtdMl": 0, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": null, "limiteHaute": null, "mlParLot": 900, "consoLotsMois": 1.785, "historiqueMl": {"2021": 18519, "2022": 23741, "2023": 18399, "2024": 19288, "2025": 16447}}, {"client": "Tokuyamma/shofu", "code": "JAR_2.5", "fibre": "AR600TEX", "rowing": "", "resine": "BIS GMA SR239", "stockMezzLots": 7.19, "stockMezzMl": 6468, "stockRtdLots": 1.71, "stockRtdMl": 1539, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 2.52, "limiteHaute": 60.6, "mlParLot": 900, "consoLotsMois": 1.785, "historiqueMl": {"2021": 18519, "2022": 23741, "2023": 18399, "2024": 19288, "2025": 16447}}, {"client": "3M", "code": "JTO_XRO_3%", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 7.08, "stockMezzMl": 3186, "stockRtdLots": 1.85, "stockRtdMl": 834, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 2.35, "limiteHaute": 56.37, "mlParLot": 450, "consoLotsMois": 1.723, "historiqueMl": {"2021": 8969, "2022": 6394, "2023": 8234, "2024": 9274, "2025": 13649}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_ROUGEØ3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.05, "stockMezzMl": 942, "stockRtdLots": 0.24, "stockRtdMl": 219, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.08, "limiteHaute": 1.95, "mlParLot": 500, "consoLotsMois": 0.042, "historiqueMl": {"2021": 345, "2022": 345, "2023": 225, "2024": 48, "2025": 296}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_BLEU_Ø3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.13, "stockMezzMl": 1020, "stockRtdLots": 0.49, "stockRtdMl": 441, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.47, "mlParLot": 500, "consoLotsMois": 0.035, "historiqueMl": {"2021": 267, "2022": 0, "2023": 144, "2024": 495, "2025": 133}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_JAUNEØ3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 1.1, "stockMezzMl": 990, "stockRtdLots": 0.33, "stockRtdMl": 300, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.05, "limiteHaute": 1.16, "mlParLot": 500, "consoLotsMois": 0.024, "historiqueMl": {"2021": 124, "2022": 136, "2023": 180, "2024": 51, "2025": 216}}, {"client": "Macrolock oval", "code": "JTO_ILLXRO_VERT_Ø3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 0.61, "stockMezzMl": 549, "stockRtdLots": 0.32, "stockRtdMl": 285, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.36, "mlParLot": 500, "consoLotsMois": 0.042, "historiqueMl": {"2021": 0, "2022": 0, "2023": 0, "2024": 1107, "2025": 139}}, {"client": "Macrolock", "code": "JTO_XRO", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.0, "stockMezzMl": 903, "stockRtdLots": 0.93, "stockRtdMl": 836, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.01, "limiteHaute": 0.14, "mlParLot": 900, "consoLotsMois": 0.156, "historiqueMl": {"2021": 810, "2022": 132, "2023": 0, "2024": 1098, "2025": 6399}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_ROUGE", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.16, "stockMezzMl": 1044, "stockRtdLots": 0.51, "stockRtdMl": 456, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.69, "limiteHaute": 16.62, "mlParLot": 900, "consoLotsMois": 0.754, "historiqueMl": {"2021": 9908, "2022": 9334, "2023": 7310, "2024": 7533, "2025": 6615}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_NOIR", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.3, "stockRtdMl": 266, "lotsAttente": 2, "lotsQuarantaine": 0, "limiteBasse": 0.25, "limiteHaute": 6.04, "mlParLot": 900, "consoLotsMois": 0.271, "historiqueMl": {"2021": 3720, "2022": 2595, "2023": 2883, "2024": 2904, "2025": 2538}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_JAUNE", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 1.8, "stockMezzMl": 1623, "stockRtdLots": 0.38, "stockRtdMl": 339, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.6, "limiteHaute": 14.45, "mlParLot": 900, "consoLotsMois": 0.528, "historiqueMl": {"2021": 8272, "2022": 6828, "2023": 3929, "2024": 4511, "2025": 4981}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_BLEU", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.83, "stockRtdMl": 747, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.34, "limiteHaute": 8.13, "mlParLot": 900, "consoLotsMois": 0.327, "historiqueMl": {"2021": 4231, "2022": 5910, "2023": 2028, "2024": 2181, "2025": 3309}}, {"client": "DT+Macrolock", "code": "JTO_ILLUSI_XRO_VERT", "fibre": "1200 TEX XRO", "rowing": "200 TEX XRO", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.55, "stockRtdMl": 1394, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.1, "limiteHaute": 2.35, "mlParLot": 900, "consoLotsMois": 0.097, "historiqueMl": {"2021": 1392, "2022": 2548, "2023": 288, "2024": 432, "2025": 580}}, {"client": "Komet / ULTRADENT", "code": "JNT_XRO_2.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 2.04, "stockMezzMl": 1020, "stockRtdLots": 1.39, "stockRtdMl": 693, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 1.81, "limiteHaute": 43.43, "mlParLot": 500, "consoLotsMois": 1.682, "historiqueMl": {"2021": 13152, "2022": 8599, "2023": 10502, "2024": 9328, "2025": 8874}}, {"client": "Komet", "code": "JNT_XRO_3.5", "fibre": "1200 TEX XRO", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.08, "stockRtdMl": 324, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.5, "limiteHaute": 11.89, "mlParLot": 300, "consoLotsMois": 0.463, "historiqueMl": {"2021": 2206, "2022": 1383, "2023": 2225, "2024": 1547, "2025": 967}}, {"client": "Apol", "code": "JTO_ROUGE_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0.4, "stockMezzMl": 360, "stockRtdLots": 0.3, "stockRtdMl": 272, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.03, "limiteHaute": 0.62, "mlParLot": 900, "consoLotsMois": 0.036, "historiqueMl": {"2021": 638, "2022": 288, "2023": 324, "2024": 141, "2025": 576}}, {"client": "Apol", "code": "JTO_BLEU_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.81, "stockRtdMl": 731, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.05, "limiteHaute": 1.31, "mlParLot": 900, "consoLotsMois": 0.036, "historiqueMl": {"2021": 680, "2022": 292, "2023": 349, "2024": 240, "2025": 378}}, {"client": "Apol", "code": "JTO_JAUNE_2.5", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 1.34, "stockRtdMl": 1205, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.02, "limiteHaute": 0.49, "mlParLot": 900, "consoLotsMois": 0.02, "historiqueMl": {"2021": 340, "2022": 127, "2023": 329, "2024": 120, "2025": 162}}, {"client": "Maillefer", "code": "JTO_2.5_BLANC", "fibre": "AR1200TEX", "rowing": "", "resine": "M640", "stockMezzLots": 0, "stockMezzMl": 0, "stockRtdLots": 0.62, "stockRtdMl": 558, "lotsAttente": 0, "lotsQuarantaine": 0, "limiteBasse": 0.33, "limiteHaute": 7.97, "mlParLot": 900, "consoLotsMois": 0.339, "historiqueMl": {"2021": 4977, "2022": 3149, "2023": 4811, "2024": 3717, "2025": 1656}}];
 
+
+// ── Forecast (import Solventum/3M "Vendor Procurement - Delv Date") ─────────
+// Données intégrées par défaut : forecast mensuel par référence FG (Material),
+// extrait de la ligne "totale" du fichier (sans n° de pièce fournisseur), sur
+// l'horizon Jul-2026 -> Jun-2027. Le calcul de consommation de jonc n'utilise
+// QUE les mois où aucune commande réelle n'existe déjà pour cette référence
+// (voir pultForecastCutoffMonth) — pour ne jamais compter en double une
+// commande déjà connue ET le forecast qui la couvrait.
+const FORECAST_DEFAULT = {"months": ["Jul-2026", "Aug-2026", "Sep-2026", "Oct-2026", "Nov-2026", "Dec-2026", "Jan-2027", "Feb-2027", "Mar-2027", "Apr-2027", "May-2027", "Jun-2027"], "data": {"7100288472": {"Jul-2026": null, "Aug-2026": 500, "Sep-2026": 1000, "Oct-2026": 500, "Nov-2026": 1500, "Dec-2026": 1000, "Jan-2027": 500, "Feb-2027": 1000, "Mar-2027": 1000, "Apr-2027": 1000, "May-2027": 1000, "Jun-2027": 500}, "7100288473": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": 500, "Oct-2026": 1500, "Nov-2026": 1600, "Dec-2026": 2000, "Jan-2027": 1500, "Feb-2027": 1000, "Mar-2027": 2000, "Apr-2027": 1600, "May-2027": 2000, "Jun-2027": 500}, "7100288474": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": 2500, "Oct-2026": 2200, "Nov-2026": 3000, "Dec-2026": 2700, "Jan-2027": 2000, "Feb-2027": 2100, "Mar-2027": 3000, "Apr-2027": 2000, "May-2027": 2600, "Jun-2027": 1100}, "7100288475": {"Jul-2026": null, "Aug-2026": 500, "Sep-2026": 1000, "Oct-2026": 1000, "Nov-2026": 1000, "Dec-2026": 1500, "Jan-2027": 500, "Feb-2027": 1000, "Mar-2027": 1000, "Apr-2027": 600, "May-2027": 1000, "Jun-2027": 500}, "7100288476": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": null, "Oct-2026": 500, "Nov-2026": 1500, "Dec-2026": 1000, "Jan-2027": 500, "Feb-2027": 1000, "Mar-2027": 1000, "Apr-2027": 600, "May-2027": 1000, "Jun-2027": 500}, "7100288477": {"Jul-2026": null, "Aug-2026": 840, "Sep-2026": null, "Oct-2026": 840, "Nov-2026": null, "Dec-2026": 840, "Jan-2027": null, "Feb-2027": 840, "Mar-2027": null, "Apr-2027": null, "May-2027": 840, "Jun-2027": null}, "7100288478": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": null, "Oct-2026": null, "Nov-2026": 1680, "Dec-2026": 840, "Jan-2027": 840, "Feb-2027": null, "Mar-2027": 840, "Apr-2027": 840, "May-2027": 840, "Jun-2027": 840}, "7100288479": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": 840, "Oct-2026": 840, "Nov-2026": 1680, "Dec-2026": 840, "Jan-2027": 840, "Feb-2027": 840, "Mar-2027": 1680, "Apr-2027": 840, "May-2027": 840, "Jun-2027": null}, "7100288480": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": null, "Oct-2026": 280, "Nov-2026": 560, "Dec-2026": 280, "Jan-2027": 280, "Feb-2027": 280, "Mar-2027": 280, "Apr-2027": 280, "May-2027": 280, "Jun-2027": 280}, "7100288485": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": null, "Oct-2026": null, "Nov-2026": 300, "Dec-2026": null, "Jan-2027": 150, "Feb-2027": 150, "Mar-2027": 150, "Apr-2027": null, "May-2027": 300, "Jun-2027": 150}, "7100318549": {"Jul-2026": 1400, "Aug-2026": 2800, "Sep-2026": 1400, "Oct-2026": 2800, "Nov-2026": 2800, "Dec-2026": 2800, "Jan-2027": 1400, "Feb-2027": 1400, "Mar-2027": 2800, "Apr-2027": 2800, "May-2027": 1400, "Jun-2027": 1400}, "7100318946": {"Jul-2026": null, "Aug-2026": 840, "Sep-2026": 840, "Oct-2026": 1680, "Nov-2026": 1680, "Dec-2026": 840, "Jan-2027": 1680, "Feb-2027": 840, "Mar-2027": 1680, "Apr-2027": 840, "May-2027": 1680, "Jun-2027": null}, "7100318947": {"Jul-2026": null, "Aug-2026": 5040, "Sep-2026": 6720, "Oct-2026": 6720, "Nov-2026": 9590, "Dec-2026": 7490, "Jan-2027": 6720, "Feb-2027": 5040, "Mar-2027": 10010, "Apr-2027": 7280, "May-2027": 6720, "Jun-2027": 3360}, "7100319078": {"Jul-2026": null, "Aug-2026": null, "Sep-2026": 6720, "Oct-2026": 6720, "Nov-2026": 8890, "Dec-2026": 6860, "Jan-2027": 6720, "Feb-2027": 5040, "Mar-2027": 9170, "Apr-2027": 5180, "May-2027": 8400, "Jun-2027": 3360}}};
+
 // ── Calculs de base ─────────────────────────────────────────────────────────
 // Retrouve le jonc de pultrusion (et son facteur de conversion) pour un tenon
 // donné. Retourne null si ce tenon n'est pas encore répertorié dans
@@ -45,6 +55,110 @@ function pultTenonsToMl(codart_wip, nbTenons) {
   const t = pultGetJoncForTenon(codart_wip);
   if (!t || !t.tenonsParMl) return null;
   return nbTenons / t.tenonsParMl;
+}
+
+// ── Calcul de consommation prévisionnelle depuis le forecast ────────────────
+let pultForecastImported = null; // {months:[...], data:{material:{mois:qte}}}
+function pultGetActiveForecast() { return pultForecastImported || FORECAST_DEFAULT; }
+
+// Convertit un libellé "Mon-YYYY" (ex: "Sep-2026") en valeur triable (année*12+mois).
+const _PULT_MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function pultMonthLabelToIndex(label) {
+  const m = String(label||'').match(/^([A-Za-z]{3})-(\d{4})$/);
+  if (!m) return null;
+  const mi = _PULT_MONTH_NAMES.indexOf(m[1]);
+  if (mi < 0) return null;
+  return parseInt(m[2]) * 12 + mi;
+}
+
+// Dernier mois pour lequel une commande réelle (restant > 0 ou déjà livrée, peu
+// importe : on regarde juste jusqu'où le carnet de commandes va) existe pour
+// cette référence FG, au format index triable. Retourne null si aucune
+// commande connue (dans ce cas, tout le forecast est pris en compte).
+function pultForecastCutoffMonth(materialCode) {
+  if (typeof pcData === 'undefined' || !pcData.commandes) return null;
+  let maxIdx = null;
+  pcData.commandes.forEach(c => {
+    if (String(c.REF_RTD||'').trim() !== materialCode) return;
+    if (!c.DATDEL) return;
+    const d = new Date(c.DATDEL);
+    if (isNaN(d)) return;
+    const idx = d.getFullYear() * 12 + d.getMonth();
+    if (maxIdx === null || idx > maxIdx) maxIdx = idx;
+  });
+  return maxIdx;
+}
+
+// Nombre de pièces FG prévues par le forecast pour cette référence, en ne
+// comptant QUE les mois postérieurs au dernier mois déjà couvert par une
+// commande connue (voir pultForecastCutoffMonth) — pour ne jamais compter en
+// double une commande déjà passée ET le forecast qui la couvrait à l'origine.
+function pultForecastPiecesForMaterial(materialCode) {
+  const fc = pultGetActiveForecast();
+  const monthsData = fc.data[materialCode];
+  if (!monthsData) return { total: 0, detail: [] };
+  const cutoff = pultForecastCutoffMonth(materialCode);
+  let total = 0;
+  const detail = [];
+  fc.months.forEach(label => {
+    const qte = monthsData[label];
+    if (!qte) return;
+    const idx = pultMonthLabelToIndex(label);
+    if (cutoff !== null && idx !== null && idx <= cutoff) return; // déjà couvert par une vraie commande
+    total += qte;
+    detail.push({ mois: label, qte });
+  });
+  return { total, detail };
+}
+
+// Ratio cumulé du niveau tenon (premier niveau de la nomenclature) jusqu'au FG —
+// combien de tenons faut-il pour 1 pièce FG. Réutilise pdpFindNomenclature
+// (pdp.js) si disponible ; retourne 1 si le produit est un "produit simple"
+// (le tenon EST le FG) ou si la nomenclature est introuvable.
+function pultGetCumRatioTenonToFG(materialCode) {
+  if (typeof pdpFindNomenclature !== 'function') return 1;
+  const nom = pdpFindNomenclature(null, materialCode);
+  if (!nom || !nom.etapes || nom.etapes.length < 2) return 1;
+  let cumRatio = 1;
+  for (let j = 0; j < nom.etapes.length - 1; j++) {
+    if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
+  }
+  return cumRatio || 1;
+}
+
+// Mètres de jonc prévisionnels nécessaires pour UNE référence FG, sur la partie
+// du forecast non déjà couverte par une commande connue.
+function pultForecastMlForMaterial(materialCode, codart_wip) {
+  const { total } = pultForecastPiecesForMaterial(materialCode);
+  if (!total) return 0;
+  const cumRatio = pultGetCumRatioTenonToFG(materialCode);
+  const tenonsNecessaires = total * cumRatio;
+  const ml = pultTenonsToMl(codart_wip, tenonsNecessaires);
+  return ml || 0;
+}
+
+// Mètres de jonc prévisionnels TOTAUX pour une référence de pultrusion donnée
+// (ex: "JTO3_2.5"), en sommant sur TOUS les produits finis qui en dépendent.
+// C'est la fonction à utiliser pour afficher la prévision dans la modale de
+// détail d'un jonc.
+function pultForecastMlForJonc(joncCode) {
+  if (typeof pdpGetActiveCorrespondances !== 'function') return { total: 0, detail: [] };
+  const corrs = pdpGetActiveCorrespondances();
+  const fc = pultGetActiveForecast();
+  let total = 0;
+  const detail = [];
+  Object.keys(fc.data).forEach(materialCode => {
+    const ref = corrs.find(r => r.code_client === materialCode);
+    if (!ref) return; // produit du forecast pas (encore) suivi dans les correspondances
+    const jonc = pultGetJoncForTenon(ref.codart_wip);
+    if (!jonc || jonc.matiere !== joncCode) return;
+    const ml = pultForecastMlForMaterial(materialCode, ref.codart_wip);
+    if (ml > 0) {
+      total += ml;
+      detail.push({ materialCode, libelle: ref.libelle_fg, ml });
+    }
+  });
+  return { total, detail };
 }
 
 // Zones à exclure du stock disponible de jonc — non-conforme / non classé /
@@ -204,14 +318,76 @@ function pultDeleteOF(id) {
   renderPultrusionPage();
 }
 
-// ── Import futur de fichiers de forecast (à venir) ──────────────────────────
-// Prévu : lier un ou plusieurs fichiers de prévision de vente/commande par
-// client pour estimer la consommation annuelle de chaque référence de jonc, et
-// comparer au stock/à la capacité de pultrusion disponible. Pas encore
-// implémenté — en attente des fichiers de forecast réels pour connaître leur
-// structure exacte, comme pour tous les autres imports de cette app.
-function pultImportForecast() {
-  if (typeof showToast === 'function') showToast('Import de forecast : bientôt disponible — envoie un exemple de fichier pour que ce soit branché.');
+// ── Import d'un fichier de forecast (format "Vendor Procurement - Delv Date") ──
+// Structure attendue : colonne A = code produit (Material), une colonne par
+// mois "Month of Mon-YYYY", et une ligne par produit SANS numéro de pièce
+// fournisseur (colonne F vide) qui représente le forecast total sur tout
+// l'horizon — les lignes AVEC un numéro de pièce fournisseur (commande déjà
+// passée) sont ignorées : on se fie plutôt au vrai carnet de commandes de
+// l'app (pcData.commandes) pour savoir jusqu'à quel mois ne pas compter le
+// forecast (voir pultForecastCutoffMonth).
+function pultImportForecast(input) {
+  if (!input || !input.files || !input.files[0]) {
+    // Appelé sans fichier (ancien bouton) : ouvrir le sélecteur.
+    const inp = document.getElementById('pult-forecast-input');
+    if (inp) inp.click();
+    return;
+  }
+  const file = input.files[0];
+  if (typeof showToast === 'function') showToast('Chargement ' + file.name + '…');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const doImport = () => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+
+        // Trouver la ligne d'en-tête (celle qui contient "Material" en 1ère colonne)
+        const headerRowIdx = rows.findIndex(r => r && String(r[0]||'').trim() === 'Material');
+        if (headerRowIdx < 0) { if (typeof showToast === 'function') showToast('Format non reconnu : colonne "Material" introuvable.'); return; }
+        const headerRow = rows[headerRowIdx];
+
+        // Colonnes de mois : celles dont l'en-tête commence par "Month of "
+        const monthCols = [];
+        headerRow.forEach((h, c) => {
+          const s = String(h||'').trim();
+          if (s.startsWith('Month of ')) monthCols.push({ col: c, label: s.replace('Month of ', '').trim() });
+        });
+        if (!monthCols.length) { if (typeof showToast === 'function') showToast('Aucune colonne mensuelle trouvée.'); return; }
+        const vendorPartCol = headerRow.findIndex(h => String(h||'').trim() === 'Vendor Part Number');
+
+        const data = {};
+        for (let r = headerRowIdx + 1; r < rows.length; r++) {
+          const row = rows[r];
+          if (!row || !row[0]) continue;
+          const material = String(row[0]).trim();
+          const vendorPart = vendorPartCol >= 0 ? row[vendorPartCol] : null;
+          if (vendorPart) continue; // ligne "commande déjà passée" : ignorée
+          const months = {};
+          monthCols.forEach(mc => {
+            const v = row[mc.col];
+            months[mc.label] = typeof v === 'number' ? v : null;
+          });
+          data[material] = months;
+        }
+
+        const nbRefs = Object.keys(data).length;
+        if (!nbRefs) { if (typeof showToast === 'function') showToast('Aucune ligne de forecast reconnue dans ce fichier.'); return; }
+
+        pultForecastImported = { months: monthCols.map(m => m.label), data };
+        if (typeof showToast === 'function') showToast(`Forecast importé : ${nbRefs} références sur ${monthCols.length} mois`);
+        if (typeof currentView !== 'undefined' && currentView === 'pultrusion' && typeof renderPultrusionPage === 'function') renderPultrusionPage();
+      } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast('Erreur import forecast : ' + err.message);
+      }
+    };
+    if (typeof loadXLSXForPdp === 'function') loadXLSXForPdp(doImport);
+    else if (typeof XLSX !== 'undefined') doImport();
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 
@@ -245,6 +421,7 @@ function pultShowDetail(code) {
   const isLive = pultIsLiveStock(r);
   const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
   const ofsRef = pultOFs.filter(o => o.code === r.code);
+  const forecast = (typeof pultForecastMlForJonc === 'function') ? pultForecastMlForJonc(r.code) : {total:0, detail:[]};
 
   // Historique annuel (en mètres) — en attendant un vrai forecast (voir note
   // pultImportForecast plus haut), c'est la meilleure donnée disponible pour se
@@ -329,8 +506,23 @@ function pultShowDetail(code) {
       </div>
       ${histRows
         ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">${histRows}</div>
-           <div style="font-size:10px;color:var(--text-faint)">Historique du fichier de planning pultrusion — sera remplacé par une vraie prévision une fois le forecast lié (bouton "Forecast" en haut de l'onglet).</div>`
-        : `<div style="font-size:11px;color:var(--text-faint);padding:12px;background:var(--bg);border-radius:var(--radius);text-align:center">Pas d'historique disponible pour cette référence.</div>`
+           <div style="font-size:10px;color:var(--text-faint);margin-bottom:16px">Historique du fichier de planning pultrusion (2021-2025).</div>`
+        : `<div style="font-size:11px;color:var(--text-faint);padding:12px;background:var(--bg);border-radius:var(--radius);text-align:center;margin-bottom:16px">Pas d'historique disponible pour cette référence.</div>`
+      }
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">
+        <i class="ti ti-trending-up" style="vertical-align:-2px;margin-right:4px"></i>Prévision (forecast, hors commandes déjà connues)
+      </div>
+      ${forecast.total > 0
+        ? `<div style="background:${style.bg};border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;text-align:center">
+             <div style="font-size:10px;color:${style.text};text-transform:uppercase;font-weight:600">Mètres de jonc encore à produire</div>
+             <div style="font-size:22px;font-weight:700;color:${style.text}">${Math.round(forecast.total).toLocaleString('fr')} m</div>
+           </div>
+           <div style="margin-bottom:8px">${forecast.detail.map(d => `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px">
+             <span>${d.libelle}</span><span style="font-weight:600">${Math.round(d.ml).toLocaleString('fr')} m</span>
+           </div>`).join('')}</div>
+           <div style="font-size:10px;color:var(--text-faint)">Calculé à partir du forecast importé, en ne comptant que les mois postérieurs à la dernière commande déjà connue pour chaque produit fini concerné.</div>`
+        : `<div style="font-size:11px;color:var(--text-faint);padding:12px;background:var(--bg);border-radius:var(--radius);text-align:center">Aucune prévision disponible pour cette matière (soit aucun forecast importé pour les produits qui l'utilisent, soit tout est déjà couvert par des commandes connues).</div>`
       }
     </div>
     <div class="modal-footer">
@@ -447,7 +639,7 @@ function renderPultrusionPage() {
     + '<div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center">'
     + (nbCritique ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FCEBEB;color:#A32D2D"><i class="ti ti-alert-circle" style="vertical-align:-2px;margin-right:4px"></i>${nbCritique} &lt; 1 mois</span>` : '')
     + (nbSurveiller ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FEF5E7;color:#633806"><i class="ti ti-clock" style="vertical-align:-2px;margin-right:4px"></i>${nbSurveiller} &lt; 3 mois</span>` : '')
-    + '<button class="btn" onclick="pultImportForecast()" style="font-size:11px;padding:5px 12px"><i class="ti ti-chart-line"></i> Forecast (bientôt)</button>'
+    + '<label class="btn" style="font-size:11px;padding:5px 12px;cursor:pointer"><i class="ti ti-chart-line"></i> Importer forecast<input type="file" accept=".xlsx,.xls" style="display:none" onchange="pultImportForecast(this)"></label>'
     + '<label class="btn" style="font-size:11px;padding:5px 12px;cursor:pointer"><i class="ti ti-upload"></i> Importer<input type="file" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="pultImportFile(this)"></label>'
     + '</div></div>';
 
