@@ -155,6 +155,51 @@ function pultForecastMlForJonc(joncCode) {
   return { total, detail };
 }
 
+// Pièces FG restant à livrer, tous clients confondus, pour une référence donnée
+// — mêmes règles que partout ailleurs dans l'app : restant > 0 ET pas "Soldée"
+// (COMMANDE_S !== 'O'). Contrairement au forecast, aucun cutoff n'est appliqué
+// ici : ce sont déjà de vraies commandes fermes, pas une projection.
+function pultCommandesPiecesForMaterial(materialCode) {
+  if (typeof pcData === 'undefined' || !pcData.commandes) return 0;
+  return pcData.commandes.reduce((s, c) => {
+    if (String(c.REF_RTD||'').trim() !== materialCode) return s;
+    if (String(c.COMMANDE_S||'').trim() === 'O') return s; // Soldée
+    const rest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
+    return rest > 0 ? s + rest : s;
+  }, 0);
+}
+
+// Mètres de jonc nécessaires pour UNE référence FG, d'après ses commandes
+// ouvertes réelles (pas le forecast).
+function pultCommandesMlForMaterial(materialCode, codart_wip) {
+  const pieces = pultCommandesPiecesForMaterial(materialCode);
+  if (!pieces) return 0;
+  const cumRatio = pultGetCumRatioTenonToFG(materialCode);
+  const ml = pultTenonsToMl(codart_wip, pieces * cumRatio);
+  return ml || 0;
+}
+
+// Mètres de jonc nécessaires TOTAUX pour une référence de pultrusion donnée,
+// d'après les commandes ouvertes réelles de TOUS les produits finis qui en
+// dépendent — le pendant "commandes fermes" de pultForecastMlForJonc
+// (prévisionnel). À utiliser ensemble pour voir stock / engagé / prévu.
+function pultCommandesMlForJonc(joncCode) {
+  if (typeof pdpGetActiveCorrespondances !== 'function') return { total: 0, detail: [] };
+  const corrs = pdpGetActiveCorrespondances();
+  let total = 0;
+  const detail = [];
+  corrs.forEach(ref => {
+    const jonc = pultGetJoncForTenon(ref.codart_wip);
+    if (!jonc || jonc.matiere !== joncCode) return;
+    const ml = pultCommandesMlForMaterial(ref.code_client, ref.codart_wip);
+    if (ml > 0) {
+      total += ml;
+      detail.push({ materialCode: ref.code_client, libelle: ref.libelle_fg, ml });
+    }
+  });
+  return { total, detail };
+}
+
 // Zones à exclure du stock disponible de jonc — non-conforme / non classé /
 // échantillons R&D. Distincte de EMPL_EXCLUS (index.html, pour les tenons/FG) :
 // les zones de stockage des joncs bruts ne sont pas les mêmes.
@@ -452,6 +497,8 @@ function pultShowDetail(code) {
   const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
   const ofsRef = pultOFs.filter(o => o.code === r.code);
   const forecast = (typeof pultForecastMlForJonc === 'function') ? pultForecastMlForJonc(r.code) : {total:0, detail:[]};
+  const commandesEnCours = (typeof pultCommandesMlForJonc === 'function') ? pultCommandesMlForJonc(r.code) : {total:0, detail:[]};
+  const stockNet = stock - (commandesEnCours.total / (r.mlParLot || 1)) - (forecast.total / (r.mlParLot || 1));
 
   // Historique annuel (en mètres) — en attendant un vrai forecast (voir note
   // pultImportForecast plus haut), c'est la meilleure donnée disponible pour se
@@ -530,6 +577,22 @@ function pultShowDetail(code) {
           <span style="color:var(--text-faint)">${o.dateDebut}${o.dateFin ? ' → '+o.dateFin : ''}</span>
         </div>`).join('')}</div>
       ` : ''}
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">
+        <i class="ti ti-shopping-cart" style="vertical-align:-2px;margin-right:4px"></i>Commandes en cours (fermes)
+      </div>
+      ${commandesEnCours.total > 0
+        ? `<div style="background:#FCEBEB;border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;text-align:center">
+             <div style="font-size:10px;color:#A32D2D;text-transform:uppercase;font-weight:600">Mètres de jonc déjà engagés</div>
+             <div style="font-size:22px;font-weight:700;color:#A32D2D">${Math.round(commandesEnCours.total).toLocaleString('fr')} m</div>
+           </div>
+           <div style="margin-bottom:8px">${commandesEnCours.detail.map(d => `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px">
+             <span>${d.libelle}</span><span style="font-weight:600">${Math.round(d.ml).toLocaleString('fr')} m</span>
+           </div>`).join('')}</div>
+           ${r.mlParLot ? `<div style="font-size:11px;font-weight:600;padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:8px">Stock net après commandes + prévision : <strong style="color:${stockNet<0?'#A32D2D':'#27500A'}">${stockNet.toLocaleString('fr',{maximumFractionDigits:1})} lots</strong></div>` : ''}
+           <div style="font-size:10px;color:var(--text-faint);margin-bottom:16px">Commandes ouvertes réelles (restant à livrer, hors commandes soldées) pour tous les produits finis qui dépendent de cette matière.</div>`
+        : `<div style="font-size:11px;color:var(--text-faint);padding:12px;background:var(--bg);border-radius:var(--radius);text-align:center;margin-bottom:16px">Aucune commande ouverte sur les produits finis qui dépendent de cette matière.</div>`
+      }
 
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px">
         <i class="ti ti-chart-line" style="vertical-align:-2px;margin-right:4px"></i>Consommation annuelle (mètres)
