@@ -4,6 +4,54 @@
 // ═══════════════════════════════════════════════════════════
 
 let cdeSelectedClient = null;
+let cdeGlobalMode = 'clients'; // 'clients' | 'chrono'
+let cdeChronoSearch = '';
+let _cdeChronoSearchTimer = null;
+
+function cdeSetGlobalMode(mode) {
+  cdeGlobalMode = mode;
+  cdeSelectedClient = null;
+  cdeSelectedFinalClient = null;
+  renderCommandesPage();
+}
+
+function cdeChronoSetSearch(val) {
+  cdeChronoSearch = val;
+  clearTimeout(_cdeChronoSearchTimer);
+  _cdeChronoSearchTimer = setTimeout(() => {
+    renderCommandesPage();
+    const inp = document.getElementById('cde-chrono-search');
+    if (inp) { inp.focus(); inp.value = val; }
+  }, 200);
+}
+
+// Toutes les lignes de commandes ouvertes (restant > 0), tous clients confondus,
+// directement depuis les données brutes — même principe que pour la vue "client
+// final RTD" : ne dépend pas de PDP_CORRESPONDANCES pour la visibilité (juste
+// pour enrichir le libellé quand la référence est suivie).
+function cdeGetAllOpenLines() {
+  const corrs = (typeof PDP_CORRESPONDANCES !== 'undefined') ? PDP_CORRESPONDANCES : [];
+  const corrByCode = {};
+  corrs.forEach(r => { corrByCode[r.code_client] = r; });
+  return (pcData.commandes||[]).map(c => {
+    const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
+    if (qteRest <= 0) return null;
+    const code = String(c.REF_RTD||'').trim();
+    const corr = corrByCode[code];
+    return {
+      numCmd: String(c.NUM_COM||''),
+      client: String(c.LIBFOU||c.CODCLI||'').trim() || 'Client non renseigné',
+      ref: code,
+      libelle: corr ? corr.libelle_fg : (String(c.LIBELL||'').trim() || code),
+      code_client: corr ? corr.code_client : code,
+      qteCde: Number(c.QTE_CDE)||0,
+      qteLiv: Number(c.QTE_LIVREE)||0,
+      qteRest,
+      datDel: cdeToISODate(c.DATDEL),
+    };
+  }).filter(Boolean);
+}
+
 let cdeSelectedFinalClient = null; // niveau intermédiaire, uniquement pour RTD
 let cdeSearchFilter = '';
 let _cdeSearchTimer = null;
@@ -401,6 +449,59 @@ function renderCommandesPage() {
   let breadcrumb = '';
   const isRTD = cdeSelectedClient === 'RTD';
 
+  // ── Toggle de mode (haut de page) : clients ou chronologique ──────────────
+  const modeToggle = '<div style="display:flex;gap:6px;margin-left:12px">'
+    + '<button onclick="cdeSetGlobalMode(\'clients\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='clients'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='clients'?'#fff':'var(--text)')+'">Par client</button>'
+    + '<button onclick="cdeSetGlobalMode(\'chrono\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='chrono'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='chrono'?'#fff':'var(--text)')+'">Par date</button>'
+    + '</div>';
+
+  if (cdeGlobalMode === 'chrono') {
+    let lines = cdeGetAllOpenLines();
+    const search = cdeChronoSearch.toLowerCase();
+    if (search) {
+      lines = lines.filter(l =>
+        l.libelle.toLowerCase().includes(search) ||
+        l.client.toLowerCase().includes(search) ||
+        l.numCmd.toLowerCase().includes(search) ||
+        l.ref.toLowerCase().includes(search)
+      );
+    }
+    lines.sort((a,b) => (a.datDel||'9999').localeCompare(b.datDel||'9999'));
+
+    const totalRestant = lines.reduce((s,l) => s+l.qteRest, 0);
+    const today = new Date().toISOString().slice(0,10);
+
+    const rowsHtml = lines.length ? lines.map(l => {
+      const isLate = l.datDel && l.datDel < today;
+      return `<tr onclick="${typeof pdpShowDetail==='function' && l.code_client ? "pdpShowDetail('"+l.code_client+"')" : ''}" style="cursor:${l.code_client?'pointer':'default'}">
+        <td style="font-size:12px;font-weight:600;color:${isLate?'#A32D2D':'var(--text)'}">${l.datDel ? cdeFmtDate(l.datDel) : '—'}${isLate?' <i class="ti ti-alert-triangle" style="font-size:11px;vertical-align:-1px" title="Livraison dépassée"></i>':''}</td>
+        <td style="font-size:11px;font-weight:700;color:var(--accent)">${l.numCmd}</td>
+        <td style="font-size:12px">${l.client}</td>
+        <td style="font-size:12px">${l.libelle}<div style="font-size:9px;color:var(--text-faint);font-family:monospace">${l.ref}</div></td>
+        <td style="text-align:right;font-size:12px">${l.qteCde.toLocaleString('fr')}</td>
+        <td style="text-align:right;font-size:12px;color:var(--text-muted)">${l.qteLiv.toLocaleString('fr')}</td>
+        <td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">${l.qteRest.toLocaleString('fr')}</span></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune commande ouverte</td></tr>';
+
+    const html = '<div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">'
+      + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+      + '<h2 style="font-size:17px;font-weight:600">Commandes</h2>'
+      + modeToggle
+      + '<input id="cde-chrono-search" placeholder="Filtrer (référence, n° commande, client)…" value="'+cdeChronoSearch+'" oninput="cdeChronoSetSearch(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:260px">'
+      + '<span style="margin-left:auto;font-size:12px;color:var(--text-muted)">'+lines.length+' ligne(s) · <strong style="color:#A32D2D">'+totalRestant.toLocaleString('fr')+'</strong> pièces restantes</span>'
+      + '</div>'
+      + '<div style="flex:1;overflow-y:auto;padding:16px 20px">'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto">'
+      + '<table class="cat-table" style="width:100%"><thead><tr>'
+      + '<th>Livraison</th><th>N° Cde</th><th>Client</th><th>Référence</th>'
+      + '<th style="text-align:right">Cdé</th><th style="text-align:right">Livré</th><th style="text-align:right">Restant</th>'
+      + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div></div>';
+
+    el.innerHTML = html;
+    return;
+  }
+
   if (!cdeSelectedClient) {
     // ── Calculateur de commande : simule le stock disponible pour un client donné,
     // en tenant compte de sa zone dédiée s'il en a une (Chaoran, DS DNA...).
@@ -591,6 +692,7 @@ function renderCommandesPage() {
     + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface)">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
     + '<h2 style="font-size:17px;font-weight:600"><i class="ti ti-shopping-cart" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Commandes</h2>'
+    + (!cdeSelectedClient ? modeToggle : '')
     + (cdeSelectedClient ? '<button class="btn" '+backAction+' style="font-size:11px;padding:4px 10px"><i class="ti ti-arrow-left"></i> '+backLabel+'</button>' : '')
     + (breadcrumb ? breadcrumb : '')
     + '</div>'
