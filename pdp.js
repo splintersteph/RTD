@@ -698,7 +698,7 @@ function pdpCalcRupture(fgCodeOrWip, stockDispo) {
   let fgCode = fgCodeOrWip;
 
   const cmdsOuvertes = pcData.commandes
-    .filter(r => String(r.REF_RTD||'').trim() === fgCode)
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
     .map(r => ({
       qteRest: (Number(r.QTE_CDE)||0) - (Number(r.QTE_LIVREE)||0),
       datDel: pdpToISODate(r.DATDEL),
@@ -1017,7 +1017,7 @@ function pdpShowDetail(code_client) {
   // au lieu de remonter la nomenclature (qui peut trouver un autre FG partageant le même WIP)
   const fgCode = code_client;
   const cmds = (typeof pcData !== 'undefined' ? (pcData.commandes||[]) : [])
-    .filter(r => String(r.REF_RTD||'').trim() === fgCode)
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
     .map(r => ({
       numCmd: String(r.NUM_COM||''),
       client: String(r.LIBFOU||r.CODCLI||''),

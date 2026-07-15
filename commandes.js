@@ -36,6 +36,7 @@ function cdeGetAllOpenLines() {
   return (pcData.commandes||[]).map(c => {
     const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
     if (qteRest <= 0) return null;
+    if (String(c.COMMANDE_S||'').trim() === 'O') return null; // "Soldée" côté ERP : à ignorer même si un restant apparaît
     const code = String(c.REF_RTD||'').trim();
     const corr = corrByCode[code];
     return {
@@ -77,10 +78,13 @@ function cdeResolveToFG(ref, code_client) {
 // code FG donné. IMPORTANT : ne PAS filtrer sur LIGNE_CDE_='N' — ce champ ne veut
 // pas dire "ouverte/fermée" (constaté sur le fichier réel : des lignes 'O' ont
 // encore un restant non nul, et 'N' semble plutôt indiquer "aucune livraison
-// encore enregistrée"). Le seul critère fiable est QTE_CDE > QTE_LIVREE.
+// encore enregistrée"). Le champ fiable pour "ouverte" est QTE_CDE > QTE_LIVREE,
+// ET COMMANDE_S !== 'O' (constaté le 15/07/2026 sur une commande ERP marquée
+// "Soldée : Oui" avec un restant non nul — COMMANDE_S semble correspondre à ce
+// vrai statut "Soldée" de l'ERP, contrairement à LIGNE_CDE_).
 function cdeGetForRef(fgCode) {
   return (pcData.commandes||[])
-    .filter(r => String(r.REF_RTD||'').trim() === fgCode)
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
     .map(r => ({
       numCmd:  String(r.NUM_COM||''),
       client:  String(r.LIBFOU||r.CODCLI||''),

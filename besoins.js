@@ -52,7 +52,7 @@ function renderBesoinsPage() {
     // Commandes ouvertes (sur le code FG final)
     const fgCode = r.code_client;
     const cmds = (typeof pcData !== 'undefined' ? (pcData.commandes || []) : [])
-      .filter(c => String(c.REF_RTD || '').trim() === fgCode)
+      .filter(c => String(c.REF_RTD || '').trim() === fgCode && String(c.COMMANDE_S||'').trim() !== 'O')
       .map(c => ({
         numCmd: String(c.NUM_COM || ''),
         qteRest: (Number(c.QTE_CDE) || 0) - (Number(c.QTE_LIVREE) || 0),
