@@ -586,7 +586,7 @@ function pultShowDetail(code) {
              <div style="font-size:10px;color:#A32D2D;text-transform:uppercase;font-weight:600">Mètres de jonc déjà engagés</div>
              <div style="font-size:22px;font-weight:700;color:#A32D2D">${Math.round(commandesEnCours.total).toLocaleString('fr')} m</div>
            </div>
-           <div style="margin-bottom:8px">${commandesEnCours.detail.map(d => `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px">
+           <div style="margin-bottom:8px">${commandesEnCours.detail.map(d => `<div onclick="if(typeof pdpShowDetail==='function')pdpShowDetail('${d.materialCode}')" style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px;cursor:pointer" onmouseenter="this.style.background='var(--accent-light)'" onmouseleave="this.style.background='var(--bg)'">
              <span>${d.libelle}</span><span style="font-weight:600">${Math.round(d.ml).toLocaleString('fr')} m</span>
            </div>`).join('')}</div>
            ${r.mlParLot ? `<div style="font-size:11px;font-weight:600;padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:8px">Stock net après commandes + prévision : <strong style="color:${stockNet<0?'#A32D2D':'#27500A'}">${stockNet.toLocaleString('fr',{maximumFractionDigits:1})} lots</strong></div>` : ''}
@@ -611,7 +611,7 @@ function pultShowDetail(code) {
              <div style="font-size:10px;color:${style.text};text-transform:uppercase;font-weight:600">Mètres de jonc encore à produire</div>
              <div style="font-size:22px;font-weight:700;color:${style.text}">${Math.round(forecast.total).toLocaleString('fr')} m</div>
            </div>
-           <div style="margin-bottom:8px">${forecast.detail.map(d => `<div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px">
+           <div style="margin-bottom:8px">${forecast.detail.map(d => `<div onclick="if(typeof pdpShowDetail==='function')pdpShowDetail('${d.materialCode}')" style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px;cursor:pointer" onmouseenter="this.style.background='var(--accent-light)'" onmouseleave="this.style.background='var(--bg)'">
              <span>${d.libelle}</span><span style="font-weight:600">${Math.round(d.ml).toLocaleString('fr')} m</span>
            </div>`).join('')}</div>
            <div style="font-size:10px;color:var(--text-faint)">Calculé à partir du forecast importé, en ne comptant que les mois postérieurs à la dernière commande déjà connue pour chaque produit fini concerné.</div>`
