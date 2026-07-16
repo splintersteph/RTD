@@ -279,7 +279,52 @@ function pultCouvertureStyle(mois) {
 // Réutilise la même mécanique que les autres imports xlsx de l'app (lazy-load
 // SheetJS via loadXLSXForPdp, défini dans pdp.js).
 let pultRefsImported = null;
-function pultGetActiveRefs() { return pultRefsImported || PULTRUSION_REFS_DEFAULT; }
+
+// ── Fusion des références partageant un même code jonc ─────────────────────
+// Un même jonc physique (ex: JAR_2.5) peut être suivi sous plusieurs lignes du
+// fichier source, une par client consommateur. Le stock est pourtant physique
+// et unique par code (qu'il vienne de la photo figée ou du stock live via
+// pultGetLiveStock) : afficher une carte par client le dupliquait à l'identique
+// et faisait perdre la couverture réelle (limiteBasse null sur une des lignes
+// masquait la couverture calculable sur l'autre). On fusionne donc en une
+// seule carte par code : clients listés, stocks/attente/quarantaine/conso/
+// historique sommés, limites sommées (capacité de conso combinée), et
+// fibre/rowing/résine/mlParLot repris de la première ligne renseignée
+// (normalement identiques puisque c'est le même jonc physique).
+function pultMergeRefsByCode(refs) {
+  const byCode = new Map();
+  refs.forEach(r => {
+    if (!byCode.has(r.code)) {
+      byCode.set(r.code, { ...r, _clients: [r.client].filter(Boolean) });
+      return;
+    }
+    const m = byCode.get(r.code);
+    if (r.client && !m._clients.includes(r.client)) m._clients.push(r.client);
+    m.stockMezzLots = (m.stockMezzLots||0) + (r.stockMezzLots||0);
+    m.stockMezzMl = (m.stockMezzMl||0) + (r.stockMezzMl||0);
+    m.stockRtdLots = (m.stockRtdLots||0) + (r.stockRtdLots||0);
+    m.stockRtdMl = (m.stockRtdMl||0) + (r.stockRtdMl||0);
+    m.lotsAttente = (m.lotsAttente||0) + (r.lotsAttente||0);
+    m.lotsQuarantaine = (m.lotsQuarantaine||0) + (r.lotsQuarantaine||0);
+    m.limiteBasse = (m.limiteBasse===null && r.limiteBasse===null) ? null : (m.limiteBasse||0) + (r.limiteBasse||0);
+    m.limiteHaute = (m.limiteHaute===null && r.limiteHaute===null) ? null : (m.limiteHaute||0) + (r.limiteHaute||0);
+    m.consoLotsMois = (m.consoLotsMois===null && r.consoLotsMois===null) ? null : (m.consoLotsMois||0) + (r.consoLotsMois||0);
+    m.mlParLot = m.mlParLot || r.mlParLot;
+    if (!m.fibre) m.fibre = r.fibre;
+    if (!m.rowing) m.rowing = r.rowing;
+    if (!m.resine) m.resine = r.resine;
+    const histA = m.historiqueMl || {};
+    const histB = r.historiqueMl || {};
+    const mergedHist = {};
+    new Set([...Object.keys(histA), ...Object.keys(histB)]).forEach(y => {
+      mergedHist[y] = (histA[y]||0) + (histB[y]||0);
+    });
+    m.historiqueMl = mergedHist;
+  });
+  return Array.from(byCode.values()).map(m => ({ ...m, client: m._clients.join(' + ') }));
+}
+
+function pultGetActiveRefs() { return pultMergeRefsByCode(pultRefsImported || PULTRUSION_REFS_DEFAULT); }
 
 function pultImportFile(input) {
   const file = input.files && input.files[0];
