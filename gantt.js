@@ -138,8 +138,10 @@ function renderGantt() {
       const right = dateToPx(endDate,   cols, colW, labelW, ganttZoom) - labelW;
       const width = Math.max(colW*0.8, right-left);
       const label = `${o.id.replace('OF-','')} — ${o.produit} · ${(o.qty/1000).toFixed(0)}k`;
+      const startLbl = typeof fmtDate === 'function' ? fmtDate(startDate.toISOString().slice(0,10)) : startDate.toLocaleDateString('fr-FR');
+      const endLbl = typeof fmtDate === 'function' ? fmtDate(endDate.toISOString().slice(0,10)) : endDate.toLocaleDateString('fr-FR');
       return `<div class="gantt-bar" data-id="${o.id}"
-        title="${o.id} — ${o.produit} (${o.qty.toLocaleString('fr')} u.)"
+        title="${o.id} — ${o.produit} (${o.qty.toLocaleString('fr')} u.)&#10;${startLbl} → ${endLbl}"
         style="position:absolute;left:${left}px;width:${width}px;top:6px;height:${rowH-12}px;
           background:${isBlocked?'#FCEBEB':cs.bg};
           border:1px solid ${isBlocked?'#F0BABA':cs.dot};
@@ -152,10 +154,10 @@ function renderGantt() {
         onmousedown="ganttMoveStart(event,'${o.id}')"
         ontouchstart="ganttMoveStart(event,'${o.id}')">
         <span style="overflow:hidden;text-overflow:ellipsis;pointer-events:none">${label}</span>
-        <span style="position:absolute;left:0;top:0;bottom:0;width:6px;cursor:w-resize;z-index:2"
+        <span class="gantt-resize-handle" style="position:absolute;left:0;top:0;bottom:0;width:6px;cursor:w-resize;z-index:2;opacity:0;transition:opacity .12s;background:rgba(0,0,0,.12)"
           onmousedown="event.stopPropagation();ganttResizeStart(event,'${o.id}','left')"
           ontouchstart="event.stopPropagation();ganttResizeStart(event,'${o.id}','left')"></span>
-        <span style="position:absolute;right:0;top:0;bottom:0;width:6px;cursor:e-resize;z-index:2"
+        <span class="gantt-resize-handle" style="position:absolute;right:0;top:0;bottom:0;width:6px;cursor:e-resize;z-index:2;opacity:0;transition:opacity .12s;background:rgba(0,0,0,.12)"
           onmousedown="event.stopPropagation();ganttResizeStart(event,'${o.id}','right')"
           ontouchstart="event.stopPropagation();ganttResizeStart(event,'${o.id}','right')"></span>
       </div>`;
@@ -180,6 +182,7 @@ function renderGantt() {
   }).filter(Boolean).join('');
 
   el.innerHTML = `
+    <style>.gantt-bar:hover .gantt-resize-handle{opacity:1 !important}</style>
     <div style="flex:1;overflow:auto" id="gantt-scroll">
       <div style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10;flex-shrink:0">
         <div style="display:flex;border:1px solid var(--border-med);border-radius:var(--radius);overflow:hidden">
@@ -326,8 +329,10 @@ function ganttMoveMove(clientX) {
     b.style.width = Math.max(20, e2 - s) + 'px';
   });
 
-  // Indicateur de date en tooltip
-  bars.forEach(b => { b.title = `${ofId} — déplacer vers ${newDate}`; });
+  // Indicateur de date en tooltip (même format lisible que le tooltip statique)
+  const newStartLbl = typeof fmtDate === 'function' ? fmtDate(newDate) : newDate;
+  const newEndLbl = typeof fmtDate === 'function' ? fmtDate(newDates.usinage||newDate) : (newDates.usinage||newDate);
+  bars.forEach(b => { b.title = `${ofId} → ${newStartLbl} → ${newEndLbl}`; });
 }
 
 function ganttMoveEnd() {
