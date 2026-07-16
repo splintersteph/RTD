@@ -154,12 +154,16 @@ function renderGantt() {
         onmousedown="ganttMoveStart(event,'${o.id}')"
         ontouchstart="ganttMoveStart(event,'${o.id}')">
         <span style="overflow:hidden;text-overflow:ellipsis;pointer-events:none">${label}</span>
-        <span class="gantt-resize-handle" style="position:absolute;left:0;top:0;bottom:0;width:6px;cursor:w-resize;z-index:2;opacity:0;transition:opacity .12s;background:rgba(0,0,0,.12)"
+        <span class="gantt-resize-handle" style="position:absolute;left:0;top:0;bottom:0;width:10px;cursor:w-resize;z-index:2;display:flex;align-items:center;justify-content:flex-start;padding-left:1px"
           onmousedown="event.stopPropagation();ganttResizeStart(event,'${o.id}','left')"
-          ontouchstart="event.stopPropagation();ganttResizeStart(event,'${o.id}','left')"></span>
-        <span class="gantt-resize-handle" style="position:absolute;right:0;top:0;bottom:0;width:6px;cursor:e-resize;z-index:2;opacity:0;transition:opacity .12s;background:rgba(0,0,0,.12)"
+          ontouchstart="event.stopPropagation();ganttResizeStart(event,'${o.id}','left')">
+          <span style="width:3px;height:60%;border-radius:2px;background:rgba(0,0,0,.18);opacity:0;transition:opacity .12s" class="gantt-resize-grip"></span>
+        </span>
+        <span class="gantt-resize-handle" style="position:absolute;right:0;top:0;bottom:0;width:10px;cursor:e-resize;z-index:2;display:flex;align-items:center;justify-content:flex-end;padding-right:1px"
           onmousedown="event.stopPropagation();ganttResizeStart(event,'${o.id}','right')"
-          ontouchstart="event.stopPropagation();ganttResizeStart(event,'${o.id}','right')"></span>
+          ontouchstart="event.stopPropagation();ganttResizeStart(event,'${o.id}','right')">
+          <span style="width:3px;height:60%;border-radius:2px;background:rgba(0,0,0,.18);opacity:0;transition:opacity .12s" class="gantt-resize-grip"></span>
+        </span>
       </div>`;
     }).join('');
 
@@ -182,7 +186,7 @@ function renderGantt() {
   }).filter(Boolean).join('');
 
   el.innerHTML = `
-    <style>.gantt-bar:hover .gantt-resize-handle{opacity:1 !important}</style>
+    <style>.gantt-bar:hover .gantt-resize-grip{opacity:1 !important}</style>
     <div style="flex:1;overflow:auto" id="gantt-scroll">
       <div style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10;flex-shrink:0">
         <div style="display:flex;border:1px solid var(--border-med);border-radius:var(--radius);overflow:hidden">
@@ -269,7 +273,7 @@ function setGanttZoom(z) {
 let ganttMoveState = null;
 
 function ganttMoveStart(e, ofId) {
-  if (e.target.classList.contains('gantt-resize-handle')) return;
+  if (e.target.closest && e.target.closest('.gantt-resize-handle')) return;
   e.preventDefault(); e.stopPropagation();
   ganttDragging = true;
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -403,7 +407,8 @@ function ganttResizeMove(clientX) {
     const {dates} = calcDates(o);
     const baseEnd = dates.usinage || o.date;
     const newEnd = addDays(baseEnd, daysDelta);
-    // Recalculer la quantité depuis la nouvelle durée
+    // Recalculer la quantité depuis la nouvelle durée — newEnd doit rester
+    // strictement après le début (au moins 1 jour), sinon on ignore le geste.
     const tc = lookupTC(o.produit);
     if (tc && newEnd > o.date) {
       const startD = new Date(o.date+'T00:00:00');
@@ -417,12 +422,14 @@ function ganttResizeMove(clientX) {
       }
     }
   } else {
-    // Étirer à gauche = décaler la date de début
+    // Étirer à gauche = décaler la date de début. Bornes : la nouvelle date de
+    // début doit rester strictement avant la fin (au moins 1 jour de marge),
+    // sans limite basse arbitraire côté passé.
+    const endDate = calcDates(o).dates.usinage || o.date;
     const newStart = addDays(o.date, daysDelta);
-    if (newStart < o.date || newStart >= (calcDates(o).dates.usinage || o.date)) {
+    if (newStart < endDate) {
       o._previewStart = newStart;
-      const {dates} = calcDates(o);
-      updateGanttBarPreview(ofId, newStart, dates.usinage || o.date);
+      updateGanttBarPreview(ofId, newStart, endDate);
     }
   }
 }
