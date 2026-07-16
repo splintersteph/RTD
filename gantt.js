@@ -15,6 +15,17 @@
 let ganttZoom = 'day';
 let ganttShowArchived = false;
 
+// Source unique pour la largeur de colonne et la largeur de la colonne
+// "Machine" — AVANT, le rendu (renderGantt) utilisait colW=30/labelW=110
+// tandis que le drag (ganttMoveMove/ganttResizeMove/updateGanttBarPreview)
+// utilisait colW=36/labelW=130. Ce décalage désynchronisait la position de
+// la tuile affichée pendant le déplacement par rapport à la grille de jours
+// réellement dessinée, ce qui rendait le drag imprécis. Tout le monde doit
+// maintenant lire ces deux fonctions/constantes plutôt que des valeurs codées
+// en dur localement.
+function ganttColW() { return ganttZoom === 'day' ? 30 : 90; }
+const GANTT_LABEL_W = 110;
+
 function getMachineOrder() {
   // Machines dans l'ordre défini + celles hors liste à la fin
   const fromMachines = machines.map(m=>m.name);
@@ -67,8 +78,8 @@ function renderGantt() {
   }
   _ganttCols = [...cols];
 
-  const colW   = ganttZoom==='day' ? 30 : 90;
-  const labelW = 110;
+  const colW   = ganttColW();
+  const labelW = GANTT_LABEL_W;
   const rowH   = 48;
   const totalW = labelW + cols.length * colW;
 
@@ -211,10 +222,13 @@ function toggleGanttArchived() {
 function ganttScrollToday() {
   const scroll = document.getElementById('gantt-scroll');
   if (!scroll) return;
-  const colW = ganttZoom==='day'?30:90;
   const today = new Date(); today.setHours(0,0,0,0);
-  const x = dateToPx(today, _ganttCols, colW, 110, ganttZoom);
-  scroll.scrollLeft = Math.max(0, x - 250);
+  const x = dateToPx(today, _ganttCols, ganttColW(), GANTT_LABEL_W, ganttZoom);
+  // Centre aujourd'hui au milieu de la zone visible (en tenant compte de la
+  // colonne "Machine" collée à gauche, qui reste toujours visible grâce à
+  // position:sticky et ne doit donc pas être comptée dans l'espace dispo).
+  const viewportW = scroll.clientWidth || 800;
+  scroll.scrollLeft = Math.max(0, x - GANTT_LABEL_W - (viewportW - GANTT_LABEL_W) / 2);
 }
 
 
@@ -259,9 +273,12 @@ function ganttMoveStart(e, ofId) {
   const o = ofs.find(x => x.id === ofId); if (!o) return;
   ganttMoveState = {ofId, startX: clientX, originalDate: o.date, lastDelta: 0};
 
-  // Feedback visuel
+  // Feedback visuel + désactive la sélection de texte pendant le drag (sinon
+  // un mousedown/mousemove rapide sélectionne le texte de la page autour de
+  // la tuile, ce qui casse la fluidité du glisser-déposer).
   const bars = document.querySelectorAll(`.gantt-bar[data-id="${ofId}"]`);
   bars.forEach(b => { b.style.opacity = '.7'; b.style.cursor = 'grabbing'; });
+  document.body.style.userSelect = 'none';
 
   const onMove = ev => {
     const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
@@ -273,6 +290,7 @@ function ganttMoveStart(e, ofId) {
     document.removeEventListener('mouseup', onUp);
     document.removeEventListener('touchmove', onMove);
     document.removeEventListener('touchend', onUp);
+    document.body.style.userSelect = '';
     setTimeout(() => { ganttDragging = false; }, 100);
   };
   document.addEventListener('mousemove', onMove);
@@ -284,7 +302,7 @@ function ganttMoveStart(e, ofId) {
 function ganttMoveMove(clientX) {
   if (!ganttMoveState) return;
   const {ofId, startX, originalDate} = ganttMoveState;
-  const colW = ganttZoom === 'day' ? 36 : 90;
+  const colW = ganttColW();
   const dx = clientX - startX;
   const daysDelta = Math.round(dx / colW * (ganttZoom === 'day' ? 1 : 7));
 
@@ -298,7 +316,7 @@ function ganttMoveMove(clientX) {
   // Mise à jour visuelle de la barre sans re-render
   const {dates: newDates} = calcDates({...o, date: newDate});
   const cols = ganttGetCols();
-  const labelW = 130;
+  const labelW = GANTT_LABEL_W;
   const s = dateToPx(new Date(newDate+'T00:00:00'), cols, colW, labelW, ganttZoom);
   const e2 = dateToPx(new Date((newDates.usinage||newDate)+'T00:00:00'), cols, colW, labelW, ganttZoom);
 
@@ -315,7 +333,6 @@ function ganttMoveMove(clientX) {
 function ganttMoveEnd() {
   if (!ganttMoveState) return;
   const {ofId, startX, originalDate} = ganttMoveState;
-  const colW = ganttZoom === 'day' ? 36 : 90;
   const daysDelta = ganttMoveState.lastDelta;
   const o = ofs.find(x => x.id === ofId);
 
@@ -345,6 +362,7 @@ function ganttResizeStart(e, ofId, side) {
   ganttDragging = true;
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   ganttResizeState = {ofId, side, startX: clientX};
+  document.body.style.userSelect = 'none';
 
   const onMove = (ev) => {
     const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
@@ -356,6 +374,7 @@ function ganttResizeStart(e, ofId, side) {
     document.removeEventListener('mouseup', onUp);
     document.removeEventListener('touchmove', onMove);
     document.removeEventListener('touchend', onUp);
+    document.body.style.userSelect = '';
     setTimeout(() => { ganttDragging = false; }, 100);
   };
   document.addEventListener('mousemove', onMove);
@@ -368,7 +387,7 @@ function ganttResizeMove(clientX) {
   if (!ganttResizeState) return;
   const {ofId, side, startX} = ganttResizeState;
   const o = ofs.find(x => x.id === ofId); if (!o) return;
-  const colW = ganttZoom === 'day' ? 36 : 90;
+  const colW = ganttColW();
   const dx = clientX - startX;
   const daysDelta = Math.round(dx / colW * (ganttZoom === 'day' ? 1 : 7));
   if (daysDelta === (ganttResizeState.lastDelta||0)) return;
@@ -422,8 +441,8 @@ function updateGanttBarPreview(ofId, startStr, endStr) {
   const bars = document.querySelectorAll(`.gantt-bar[data-id="${ofId}"]`);
   bars.forEach(bar => {
     const cols = ganttGetCols();
-    const colW = ganttZoom==='day'?36:90;
-    const labelW = 130;
+    const colW = ganttColW();
+    const labelW = GANTT_LABEL_W;
     const s = dateToPx(new Date(startStr+'T00:00:00'), cols, colW, labelW, ganttZoom);
     const e2 = dateToPx(new Date(endStr+'T00:00:00'), cols, colW, labelW, ganttZoom);
     bar.style.left  = (s-labelW)+'px';
