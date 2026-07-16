@@ -679,6 +679,8 @@ function renderPultrusionPage() {
     const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
     const ofsRef = pultOFs.filter(o => o.code === r.code);
     const isLive = pultIsLiveStock(r);
+    const liveMl = pultGetLiveStock(r.code);
+    const stockMlDisplay = liveMl !== null ? liveMl : (r.stockMezzMl + r.stockRtdMl);
     return `<div onclick="pultShowDetail('${r.code.replace(/'/g,"\\'")}')" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid ${style.dot};border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseleave="this.style.boxShadow='none'">
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
@@ -695,7 +697,7 @@ function renderPultrusionPage() {
         </div>
         <div style="background:var(--bg);border-radius:6px;padding:6px 8px">
           <div style="color:var(--text-faint);font-size:9px;text-transform:uppercase">Stock mètres</div>
-          <div style="font-weight:700">${(r.stockMezzMl+r.stockRtdMl).toLocaleString('fr')}</div>
+          <div style="font-weight:700">${stockMlDisplay.toLocaleString('fr')}</div>
         </div>
       </div>
       ${r.lotsAttente > 0 ? `<div style="margin-top:6px;font-size:10px;color:var(--text-muted)"><i class="ti ti-clock" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${r.lotsAttente.toLocaleString('fr',{maximumFractionDigits:1})} lot(s) en attente de contrôle</div>` : ''}
