@@ -2406,9 +2406,9 @@ function openDetail(id){
     </div>
     <div class="modal-footer"><div class="step-nav">
       ${canPrev?`<button class="btn" onclick="moveStage('${id}',-1)"><i class="ti ti-arrow-left"></i> Préc.</button>`:''}
-      <button class="btn" onclick="editOf('${id}')"><i class="ti ti-edit"></i></button>
-      <button class="btn" onclick="editDates('${id}')" title="Modifier les dates"><i class="ti ti-calendar-event"></i></button>
-      <button class="btn btn-danger" onclick="deleteOf('${id}')"><i class="ti ti-trash"></i></button>
+      <button class="btn" onclick="editOf('${id}')"><i class="ti ti-edit"></i> Modifier</button>
+      <button class="btn" onclick="editDates('${id}')" title="Modifier les dates"><i class="ti ti-calendar-event"></i> Dates</button>
+      <button class="btn btn-danger" onclick="deleteOf('${id}')"><i class="ti ti-trash"></i> Supprimer</button>
       <span class="spacer"></span>
       ${isLast?`<button class="btn btn-archive" onclick="archiverOf('${id}')"><i class="ti ti-archive"></i> Clôturer</button>`:`<button class="btn btn-primary" onclick="moveStage('${id}',1)">Suiv. <i class="ti ti-arrow-right"></i></button>`}
     </div></div>`;
