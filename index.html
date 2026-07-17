@@ -2001,11 +2001,11 @@ function showMachineDetailArchives(machine) {
       onmouseenter="this.style.background='var(--accent-light)'"
       onmouseleave="this.style.background=''">
       <span style="font-size:11px;font-weight:600;color:var(--accent);width:80px;flex-shrink:0">${a.id}</span>
-      <span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:20px;background:${cs.bg};color:${cs.text};flex-shrink:0">${client}</span>
+      <span style="width:100px;flex-shrink:0"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:20px;background:${cs.bg};color:${cs.text}">${client}</span></span>
       <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.produit}</span>
-      <span style="font-size:11px;color:var(--text-muted);flex-shrink:0">${(a.qty||0).toLocaleString('fr')} u.</span>
-      ${pct!==null?`<span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:20px;background:${qBg};color:${qC};flex-shrink:0">${pct}%</span>`:''}
-      ${lt!==null?`<span style="font-size:11px;color:var(--text-faint);flex-shrink:0">${leadTimeFmt(lt)}</span>`:''}
+      <span style="font-size:11px;color:var(--text-muted);width:72px;flex-shrink:0;text-align:right">${(a.qty||0).toLocaleString('fr')} u.</span>
+      <span style="width:48px;flex-shrink:0;text-align:right">${pct!==null?`<span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:20px;background:${qBg};color:${qC}">${pct}%</span>`:''}</span>
+      <span style="width:44px;flex-shrink:0;text-align:right;font-size:11px;color:var(--text-faint)">${lt!==null?leadTimeFmt(lt):''}</span>
       <i class="ti ti-chevron-right" style="font-size:11px;color:var(--text-faint);flex-shrink:0"></i>
     </div>`;
   }).join('');
@@ -2060,12 +2060,12 @@ function showProduitDetailArchives(produit) {
       onmouseenter="this.style.background='var(--accent-light)'"
       onmouseleave="this.style.background=''">
       <span style="font-size:11px;font-weight:600;color:var(--accent);width:80px;flex-shrink:0">${a.id}</span>
-      <span style="font-size:11px;color:var(--text-muted);flex-shrink:0">${a.machine||'—'}</span>
-      <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;font-family:monospace">${a.archivedAt||'—'}</span>
+      <span style="font-size:11px;color:var(--text-muted);width:80px;flex-shrink:0">${a.machine||'—'}</span>
+      <span style="font-size:11px;color:var(--text-muted);width:80px;flex-shrink:0;font-family:monospace">${a.archivedAt||'—'}</span>
       <span style="flex:1"></span>
-      <span style="font-size:11px;color:var(--text-muted);flex-shrink:0">${(a.qty||0).toLocaleString('fr')} u.</span>
-      ${pct!==null?`<span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:20px;background:${qBg};color:${qC};flex-shrink:0">${pct}%</span>`:''}
-      ${lt!==null?`<span style="font-size:11px;color:var(--text-faint);flex-shrink:0">${leadTimeFmt(lt)}</span>`:''}
+      <span style="font-size:11px;color:var(--text-muted);width:72px;flex-shrink:0;text-align:right">${(a.qty||0).toLocaleString('fr')} u.</span>
+      <span style="width:48px;flex-shrink:0;text-align:right">${pct!==null?`<span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:20px;background:${qBg};color:${qC}">${pct}%</span>`:''}</span>
+      <span style="width:44px;flex-shrink:0;text-align:right;font-size:11px;color:var(--text-faint)">${lt!==null?leadTimeFmt(lt):''}</span>
       <i class="ti ti-chevron-right" style="font-size:11px;color:var(--text-faint);flex-shrink:0"></i>
     </div>`;
   }).join('');
