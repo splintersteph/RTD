@@ -65,6 +65,24 @@ function consoFmtMois(mois) {
   return mois.toFixed(1) + ' mois';
 }
 
+// Évolution des ventes d'une année sur l'autre (12 derniers mois vs 12 mois
+// précédents, sur la même fenêtre de 24 mois glissants déjà importée). Renvoie
+// null si la donnée n'a pas la répartition par année (ex : jeu de données par
+// défaut CONSO_DEFAULT, capturé avant l'ajout de cette fonctionnalité — pas de
+// pourcentage inventé à partir d'un simple total).
+function consoGetYoYPercent(code_client) {
+  const entry = consoGetEntry(code_client);
+  if (!entry || entry.qteAn1 === undefined || entry.qteAn2 === undefined) return null;
+  if (!entry.qteAn2) return null; // division par zéro évitée : pas de référence l'an dernier
+  return ((entry.qteAn1 - entry.qteAn2) / entry.qteAn2) * 100;
+}
+
+function consoFmtYoY(pct) {
+  if (pct === null || pct === undefined) return '—';
+  const sign = pct > 0 ? '+' : '';
+  return sign + Math.round(pct) + '%';
+}
+
 // Style cohérent (couleur/fond) réutilisé partout : tuiles PDP, onglet dédié,
 // onglet Besoins. Seuils : <1 mois = critique, <3 mois = à surveiller, sinon
 // couvert. Pas de vente connue = neutre (gris).
@@ -73,6 +91,13 @@ function consoCouvertureStyle(mois) {
   if (mois < 1)  return {bg:'#FCEBEB', text:'#A32D2D', dot:'#A32D2D'};
   if (mois < 3)  return {bg:'#FEF5E7', text:'#633806', dot:'#D4880A'};
   return {bg:'#EAF3DE', text:'#27500A', dot:'#1D9E75'};
+}
+
+function consoFmtYoYStyle(pct) {
+  if (pct === null || pct === undefined) return {bg:'var(--bg)', text:'var(--text-faint)'};
+  if (pct > 0) return {bg:'#EAF3DE', text:'#27500A'};
+  if (pct < 0) return {bg:'#FCEBEB', text:'#A32D2D'};
+  return {bg:'var(--bg)', text:'var(--text-faint)'};
 }
 
 // ── Import d'un export COMMANDELIST plus récent (remplace CONSO_DEFAULT) ───────
@@ -94,6 +119,9 @@ function consoImportFile(input) {
 
         const today = new Date(); today.setHours(0,0,0,0);
         const cutoff = new Date(today.getTime() - 730*86400000); // 2 ans glissants
+        // Milieu de la fenêtre : sépare "les 12 derniers mois" (an1) de "les 12
+        // mois précédents" (an2), pour permettre un calcul d'évolution A/A.
+        const midCutoff = new Date(today.getTime() - 365*86400000);
 
         const agg = {};
         let nbLignesRetenues = 0;
@@ -105,9 +133,11 @@ function consoImportFile(input) {
           const qte = Number(r.QTE_LIVREE)||0;
           if (!ref || qte <= 0) return;
           const libelle = String(r.LIBELL||'').trim();
-          if (!agg[ref]) agg[ref] = {ref, libelle, qte:0, nb:0};
+          if (!agg[ref]) agg[ref] = {ref, libelle, qte:0, nb:0, qteAn1:0, qteAn2:0};
           agg[ref].qte += qte;
           agg[ref].nb += 1;
+          if (d >= midCutoff) agg[ref].qteAn1 += qte; // 12 derniers mois
+          else agg[ref].qteAn2 += qte;                // 12 mois précédents
           nbLignesRetenues++;
         });
 
@@ -189,7 +219,8 @@ function renderConsoPage() {
     const entry = consoGetEntry(r.code_client);
     const moyenne = consoGetMoyenneMensuelle(r.code_client);
     const couverture = consoGetCouvertureMois(r.code_client, stock);
-    return { r, entry, stock, moyenne, qteTotale: entry ? entry.qte : null, couverture };
+    const yoy = consoGetYoYPercent(r.code_client);
+    return { r, entry, stock, moyenne, qteTotale: entry ? entry.qte : null, couverture, yoy };
   });
 
   const COL_DEFAULT = {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
@@ -287,6 +318,7 @@ function renderConsoPage() {
       if (field === 'couverture') { va=a.couverture; vb=b.couverture; }
       else if (field === 'stock') { va=a.stock; vb=b.stock; }
       else if (field === 'conso') { va=a.qteTotale; vb=b.qteTotale; }
+      else if (field === 'yoy') { va=a.yoy; vb=b.yoy; }
       else if (field === 'produit') { va=a.r.libelle_fg.toLowerCase(); vb=b.r.libelle_fg.toLowerCase(); }
       else { va=a.couverture; vb=b.couverture; }
       if (nullsLast(va) && nullsLast(vb)) return 0;
@@ -308,23 +340,27 @@ function renderConsoPage() {
       + '<th style="text-align:right;cursor:pointer" onclick="consoSort(\'stock\')">Stock FG '+sortIcon('stock')+'</th>'
       + '<th style="text-align:right;cursor:pointer" onclick="consoSort(\'conso\')">Vendu '+moisPeriode.toFixed(0)+' mois '+sortIcon('conso')+'</th>'
       + '<th style="text-align:right">Moyenne/mois</th>'
+      + '<th style="text-align:right;cursor:pointer" onclick="consoSort(\'yoy\')" title="12 derniers mois vs 12 mois précédents">Évol. A/A '+sortIcon('yoy')+'</th>'
       + '<th style="text-align:right;cursor:pointer" onclick="consoSort(\'couverture\')">Couverture '+sortIcon('couverture')+'</th>'
       + '</tr></thead><tbody>';
 
     if (rows.length) {
       rows.forEach(x => {
         const style = consoCouvertureStyle(x.couverture);
+        const yoyStyle = consoFmtYoYStyle(x.yoy);
+        const yoyIcon = (x.yoy !== null && x.yoy !== undefined) ? (x.yoy > 0 ? 'ti-trending-up' : (x.yoy < 0 ? 'ti-trending-down' : 'ti-minus')) : '';
         mainContent += `<tr style="cursor:pointer" onclick="if(typeof pdpShowDetail==='function')pdpShowDetail('${x.r.code_client}')"
           onmouseenter="this.style.background='var(--accent-light)'" onmouseleave="this.style.background=''">
           <td><div style="font-size:13px;font-weight:600">${x.r.libelle_fg}</div><div style="font-size:10px;color:var(--text-faint);font-family:monospace">${x.r.code_client}</div></td>
           <td style="text-align:right;font-size:13px;font-weight:600">${x.stock.toLocaleString('fr')}</td>
           <td style="text-align:right;font-size:12px">${x.qteTotale!==null ? x.qteTotale.toLocaleString('fr') : '—'}</td>
           <td style="text-align:right;font-size:12px;color:var(--text-muted)">${x.moyenne!==null ? Math.round(x.moyenne).toLocaleString('fr') : '—'}</td>
+          <td style="text-align:right"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:${yoyStyle.bg};color:${yoyStyle.text}">${yoyIcon?`<i class="ti ${yoyIcon}" style="font-size:10px;vertical-align:-1px;margin-right:2px"></i>`:''}${consoFmtYoY(x.yoy)}</span></td>
           <td style="text-align:right"><span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;background:${style.bg};color:${style.text}">${consoFmtMois(x.couverture)}</span></td>
         </tr>`;
       });
     } else {
-      mainContent += '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune référence</td></tr>';
+      mainContent += '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune référence</td></tr>';
     }
     mainContent += '</tbody></table></div>';
   }
