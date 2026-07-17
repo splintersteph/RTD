@@ -82,31 +82,6 @@ function stockGetAllRefs() {
 }
 
 
-function renderStockPage() {
-  const el = document.getElementById('view-stock');
-  if (!el) return;
-
-  const hasStock     = pcData.stock.length > 0;
-  const hasCommandes = pcData.commandes.length > 0;
-  const hasOF        = pcData.ofEnCours.length > 0;
-
-  function importBadge(label, count, date, type, accept) {
-    const ok = count > 0;
-    return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:'+(ok?'#EAF3DE':'var(--bg)')+';border:1px solid '+(ok?'#C0DD97':'var(--border)')+';border-radius:var(--radius);flex:1;min-width:150px">'
-      +'<i class="ti ti-'+(ok?'circle-check':'upload')+'" style="color:'+(ok?'#27500A':'var(--text-faint)')+';font-size:16px;flex-shrink:0"></i>'
-      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:'+(ok?'#27500A':'var(--text-muted)')+'">'+label+'</div>'
-      +'<div style="font-size:10px;color:var(--text-faint)">'+(ok?count+' lignes · '+date:'Non importé')+'</div></div>'
-      +'<label style="cursor:pointer;background:var(--accent);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;white-space:nowrap">'
-      +(ok?'↺':'↑')+' Import'
-      +'<input type="file" accept=".xlsx,.xls" style="display:none" onchange="pcImport(\''+type+'\',this)"></label></div>';
-  }
-
-  // Refs disponibles pour la liste
-  const allRefs = stockGetAllRefs();
-  const filteredRefs = stockFilter
-    ? allRefs.filter(r => r.toLowerCase().includes(stockFilter.toLowerCase()))
-    : allRefs;
-
 // Calcule le stock disponible ET l'en-cours de production en équivalent FG pour une
 // référence, en tenant compte de TOUTE la nomenclature si elle existe (tenon →
 // blister → FG…), chaque niveau divisé par son ratio CUMULÉ jusqu'au FG — pas la
@@ -115,6 +90,10 @@ function renderStockPage() {
 // et par le calculateur de commande (scCalc) : NE PAS réimplémenter ailleurs, ça a
 // déjà causé plusieurs divergences (stock/en-cours gonflés, calculateur ignorant
 // le stock amont).
+// IMPORTANT : cette fonction doit rester au niveau racine du fichier (pas imbriquée
+// dans renderStockPage) — scCalc() est définie plus loin comme fonction indépendante
+// et ne pourrait pas y accéder sinon (c'est exactement ce qui a cassé le calculateur
+// une première fois : la fonction était collée à l'intérieur de renderStockPage).
 function stockGetDispoEtEnCours(ref) {
   const nomForRef = (typeof findNomenclatureByCodart === 'function') ? findNomenclatureByCodart(ref) : null;
 
@@ -140,10 +119,32 @@ function stockGetDispoEtEnCours(ref) {
   return { dispo: dispoSum, enCours: encSum };
 }
 
+function renderStockPage() {
+  const el = document.getElementById('view-stock');
+  if (!el) return;
+
+  const hasStock     = pcData.stock.length > 0;
+  const hasCommandes = pcData.commandes.length > 0;
+  const hasOF        = pcData.ofEnCours.length > 0;
+
+  function importBadge(label, count, date, type, accept) {
+    const ok = count > 0;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:'+(ok?'#EAF3DE':'var(--bg)')+';border:1px solid '+(ok?'#C0DD97':'var(--border)')+';border-radius:var(--radius);flex:1;min-width:150px">'
+      +'<i class="ti ti-'+(ok?'circle-check':'upload')+'" style="color:'+(ok?'#27500A':'var(--text-faint)')+';font-size:16px;flex-shrink:0"></i>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:'+(ok?'#27500A':'var(--text-muted)')+'">'+label+'</div>'
+      +'<div style="font-size:10px;color:var(--text-faint)">'+(ok?count+' lignes · '+date:'Non importé')+'</div></div>'
+      +'<label style="cursor:pointer;background:var(--accent);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;white-space:nowrap">'
+      +(ok?'↺':'↑')+' Import'
+      +'<input type="file" accept=".xlsx,.xls" style="display:none" onchange="pcImport(\''+type+'\',this)"></label></div>';
+  }
+
+  // Refs disponibles pour la liste
+  const allRefs = stockGetAllRefs();
+  const filteredRefs = stockFilter
+    ? allRefs.filter(r => r.toLowerCase().includes(stockFilter.toLowerCase()))
+    : allRefs;
 
   // Détail de la référence sélectionnée
-  // Si une nomenclature existe pour cette ref, on additionne TOUS les niveaux
-  // (comme dans le PDP) plutôt que de ne regarder que cette seule référence
   let detailHtml = '';
   if (stockSelectedRef && hasStock) {
     const { dispo, enCours } = stockGetDispoEtEnCours(stockSelectedRef);
