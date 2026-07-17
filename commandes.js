@@ -139,6 +139,13 @@ document.addEventListener('click', function(e) {
       cdeSelectedFinalClient = arg || null;
       cdeSearchFilter = '';
       renderCommandesPage();
+    } else if (act === 'select-rtd-final-client') {
+      // Raccourci depuis la vue d'ensemble : ouvre directement le détail d'un
+      // client final RTD sans passer par l'étape intermédiaire "carte RTD".
+      cdeSelectedClient = 'RTD';
+      cdeSelectedFinalClient = arg || null;
+      cdeSearchFilter = '';
+      renderCommandesPage();
     } else if (act === 'back-to-final-clients') {
       cdeSelectedFinalClient = null;
       cdeSearchFilter = '';
@@ -538,25 +545,61 @@ function renderCommandesPage() {
     // en tenant compte de sa zone dédiée s'il en a une (Chaoran, DS DNA...).
     mainContent += cdeCalcRenderSection();
 
-    // ── Vue d'ensemble : une carte par client ──────────────────────────────
-    mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
-    clients.forEach(cl => {
-      const col = CLIENT_COLORS[cl] || COL_DEFAULT;
-      const stats = clientStats(cl);
-      mainContent +=
-        '<div data-cde-action="select-client" data-cde-arg="'+cl+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
-        +' onmouseenter="this.style.background=\''+col.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
-        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-        +'<span style="font-size:14px;font-weight:700;color:'+col.text+';flex:1">'+cl+'</span>'
-        +(stats.totalCmds>0?'<span style="font-size:10px;font-weight:700;background:'+col.dot+';color:#fff;padding:2px 8px;border-radius:20px">'+stats.totalCmds+'</span>':'')
-        +'</div>'
-        +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
-        +'<span>'+stats.refsAvecCdes+' réf. concernées</span>'
-        +'<span style="font-weight:700;color:'+(stats.totalQte>0?'#A32D2D':'var(--text-faint)')+'">'+stats.totalQte.toLocaleString('fr')+' pièces</span>'
-        +(cl==='RTD'?'<span style="font-size:10px;color:var(--text-faint)"><i class="ti ti-chevron-right"></i></span>':'')
-        +'</div></div>';
-    });
-    mainContent += '</div>';
+    // ── Vue d'ensemble : clients OEM d'abord, puis tous les clients finaux RTD
+    // affichés directement (plus besoin de cliquer sur une carte "RTD" pour les
+    // voir) — les deux groupes sont visuellement séparés par un intertitre.
+    const oemClients = clients.filter(cl => cl !== 'RTD');
+    const sectionHeader = (label, count) =>
+      '<div style="display:flex;align-items:center;gap:10px;margin:22px 0 12px 0">'
+      + '<span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-faint);text-transform:uppercase">'+label+'</span>'
+      + (count!==undefined ? '<span style="font-size:10px;font-weight:700;background:var(--bg);color:var(--text-faint);padding:1px 7px;border-radius:20px;border:1px solid var(--border)">'+count+'</span>' : '')
+      + '<span style="flex:1;height:1px;background:var(--border)"></span>'
+      + '</div>';
+
+    if (oemClients.length) {
+      mainContent += sectionHeader('Clients OEM', oemClients.length);
+      mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
+      oemClients.forEach(cl => {
+        const col = CLIENT_COLORS[cl] || COL_DEFAULT;
+        const stats = clientStats(cl);
+        mainContent +=
+          '<div data-cde-action="select-client" data-cde-arg="'+cl+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+          +' onmouseenter="this.style.background=\''+col.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+          +'<span style="font-size:14px;font-weight:700;color:'+col.text+';flex:1">'+cl+'</span>'
+          +(stats.totalCmds>0?'<span style="font-size:10px;font-weight:700;background:'+col.dot+';color:#fff;padding:2px 8px;border-radius:20px">'+stats.totalCmds+'</span>':'')
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
+          +'<span>'+stats.refsAvecCdes+' réf. concernées</span>'
+          +'<span style="font-weight:700;color:'+(stats.totalQte>0?'#A32D2D':'var(--text-faint)')+'">'+stats.totalQte.toLocaleString('fr')+' pièces</span>'
+          +'</div></div>';
+      });
+      mainContent += '</div>';
+    }
+
+    if (clients.includes('RTD')) {
+      const colRTD = CLIENT_COLORS['RTD'] || COL_DEFAULT;
+      const perFinal = cdeRTDFinalClientStats();
+      const finalNames = Object.keys(perFinal).sort();
+      mainContent += sectionHeader('Clients RTD — par client final', finalNames.length);
+      if (finalNames.length) {
+        mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
+        finalNames.forEach(fc => {
+          const s = perFinal[fc];
+          mainContent +=
+            '<div data-cde-action="select-rtd-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+colRTD.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+            +' onmouseenter="this.style.background=\''+colRTD.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+            +'<div style="font-size:13px;font-weight:700;color:'+colRTD.text+';margin-bottom:10px">'+fc+'</div>'
+            +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
+            +'<span>'+s.refs.size+' réf.</span>'
+            +'<span style="font-weight:700;color:#A32D2D">'+s.totalQte.toLocaleString('fr')+' pièces</span>'
+            +'</div></div>';
+        });
+        mainContent += '</div>';
+      } else {
+        mainContent += '<div style="text-align:center;padding:30px;color:var(--text-faint)"><i class="ti ti-circle-check" style="font-size:24px;display:block;margin-bottom:6px;color:#27500A"></i>Aucune commande ouverte sur les références RTD</div>';
+      }
+    }
 
     if (!hasCommandes) {
       mainContent += '<div style="margin-top:14px;padding:12px 16px;background:var(--bg);border:1px dashed var(--border-med);border-radius:var(--radius);font-size:12px;color:var(--text-faint);text-align:center">'
