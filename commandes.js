@@ -30,7 +30,8 @@ function cdeChronoSetSearch(val) {
 // final RTD" : ne dépend pas de PDP_CORRESPONDANCES pour la visibilité (juste
 // pour enrichir le libellé quand la référence est suivie).
 function cdeGetAllOpenLines() {
-  const corrs = (typeof PDP_CORRESPONDANCES !== 'undefined') ? PDP_CORRESPONDANCES : [];
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances()
+    : (typeof PDP_CORRESPONDANCES !== 'undefined' ? PDP_CORRESPONDANCES : []);
   const corrByCode = {};
   corrs.forEach(r => { corrByCode[r.code_client] = r; });
   return (pcData.commandes||[]).map(c => {
@@ -413,15 +414,16 @@ function renderCommandesPage() {
 
   const hasCommandes = (pcData.commandes||[]).length > 0;
 
-  // Regrouper PDP_CORRESPONDANCES par client (comme dans le PDP)
+  // Regrouper les correspondances actives (imports/données persistées inclus,
+  // comme dans le PDP — voir pdpGetActiveCorrespondances) par client
   const byClient = {};
-  if (typeof PDP_CORRESPONDANCES !== 'undefined') {
-    PDP_CORRESPONDANCES.forEach(c => {
-      const key = c.client;
-      byClient[key] = byClient[key] || [];
-      byClient[key].push(c);
-    });
-  }
+  const _activeCorrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances()
+    : (typeof PDP_CORRESPONDANCES !== 'undefined' ? PDP_CORRESPONDANCES : []);
+  _activeCorrs.forEach(c => {
+    const key = c.client;
+    byClient[key] = byClient[key] || [];
+    byClient[key].push(c);
+  });
   const clients = Object.keys(byClient).sort();
 
   // Pour chaque client, calculer le total de commandes ouvertes et le nombre
