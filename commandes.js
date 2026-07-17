@@ -8,6 +8,34 @@ let cdeGlobalMode = 'clients'; // 'clients' | 'chrono'
 let cdeChronoSearch = '';
 let _cdeChronoSearchTimer = null;
 
+// Palette pour diversifier visuellement les clients finaux RTD (Chaoran, Dental
+// Cube, etc.) — contrairement aux clients OEM (3M, APOL...) qui ont chacun une
+// couleur de marque dédiée dans PDP_CLIENT_COLORS, les clients finaux RTD sont
+// nombreux et variables (dépendants des commandes importées), donc on leur
+// attribue une couleur par hash déterministe du nom plutôt qu'une liste figée :
+// la même couleur revient toujours pour le même client, sans configuration à
+// maintenir à chaque nouveau client.
+const CDE_RTD_FINAL_PALETTE = [
+  {bg:'#E0F2FE', dot:'#0EA5E9', text:'#0C4A6E'}, // sky
+  {bg:'#EDE9FE', dot:'#7C3AED', text:'#4C1D95'}, // violet
+  {bg:'#FCE8F3', dot:'#C026D3', text:'#86198F'}, // fuchsia
+  {bg:'#FEF3C7', dot:'#D97706', text:'#92400E'}, // amber
+  {bg:'#D1FAE5', dot:'#059669', text:'#065F46'}, // emerald
+  {bg:'#FEE2E2', dot:'#DC2626', text:'#991B1B'}, // rouge
+  {bg:'#F0FDF4', dot:'#16A34A', text:'#14532D'}, // vert
+  {bg:'#E8F0FE', dot:'#4C8EDA', text:'#185FA5'}, // bleu
+  {bg:'#FFF4E6', dot:'#F59E0B', text:'#92400E'}, // orange
+  {bg:'#F0FFFE', dot:'#0891B2', text:'#164E63'}, // cyan
+  {bg:'#FDF2F8', dot:'#DB2777', text:'#831843'}, // rose
+  {bg:'#F7FEE7', dot:'#65A30D', text:'#365314'}, // lime
+];
+function cdeColorForFinalClient(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return CDE_RTD_FINAL_PALETTE[h % CDE_RTD_FINAL_PALETTE.length];
+}
+
 function cdeSetGlobalMode(mode) {
   cdeGlobalMode = mode;
   cdeSelectedClient = null;
@@ -578,7 +606,6 @@ function renderCommandesPage() {
     }
 
     if (clients.includes('RTD')) {
-      const colRTD = CLIENT_COLORS['RTD'] || COL_DEFAULT;
       const perFinal = cdeRTDFinalClientStats();
       const finalNames = Object.keys(perFinal).sort();
       mainContent += sectionHeader('Clients RTD — par client final', finalNames.length);
@@ -586,10 +613,11 @@ function renderCommandesPage() {
         mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
         finalNames.forEach(fc => {
           const s = perFinal[fc];
+          const colFc = cdeColorForFinalClient(fc);
           mainContent +=
-            '<div data-cde-action="select-rtd-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+colRTD.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
-            +' onmouseenter="this.style.background=\''+colRTD.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
-            +'<div style="font-size:13px;font-weight:700;color:'+colRTD.text+';margin-bottom:10px">'+fc+'</div>'
+            '<div data-cde-action="select-rtd-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+colFc.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+            +' onmouseenter="this.style.background=\''+colFc.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+            +'<div style="font-size:13px;font-weight:700;color:'+colFc.text+';margin-bottom:10px">'+fc+'</div>'
             +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
             +'<span>'+s.refs.size+' réf.</span>'
             +'<span style="font-weight:700;color:#A32D2D">'+s.totalQte.toLocaleString('fr')+' pièces</span>'
@@ -609,7 +637,6 @@ function renderCommandesPage() {
 
   } else if (isRTD && !cdeSelectedFinalClient) {
     // ── Niveau intermédiaire RTD : une carte par client final réel ─────────
-    const col = CLIENT_COLORS['RTD'] || COL_DEFAULT;
     const perFinal = cdeRTDFinalClientStats();
     const finalNames = Object.keys(perFinal).sort();
 
@@ -619,10 +646,11 @@ function renderCommandesPage() {
       mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
       finalNames.forEach(fc => {
         const s = perFinal[fc];
+        const colFc = cdeColorForFinalClient(fc);
         mainContent +=
-          '<div data-cde-action="select-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
-          +' onmouseenter="this.style.background=\''+col.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
-          +'<div style="font-size:13px;font-weight:700;color:'+col.text+';margin-bottom:10px">'+fc+'</div>'
+          '<div data-cde-action="select-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+colFc.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+          +' onmouseenter="this.style.background=\''+colFc.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+          +'<div style="font-size:13px;font-weight:700;color:'+colFc.text+';margin-bottom:10px">'+fc+'</div>'
           +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
           +'<span>'+s.refs.size+' réf.</span>'
           +'<span style="font-weight:700;color:#A32D2D">'+s.totalQte.toLocaleString('fr')+' pièces</span>'
@@ -635,7 +663,8 @@ function renderCommandesPage() {
 
   } else {
     // ── Vue détail : commandes d'un client (ou d'un client final RTD) ──────
-    const col = CLIENT_COLORS[isRTD ? 'RTD' : cdeSelectedClient] || COL_DEFAULT;
+    const col = (isRTD && cdeSelectedFinalClient) ? cdeColorForFinalClient(cdeSelectedFinalClient)
+      : (CLIENT_COLORS[isRTD ? 'RTD' : cdeSelectedClient] || COL_DEFAULT);
     const search = cdeSearchFilter.toLowerCase();
 
     if (isRTD) {
