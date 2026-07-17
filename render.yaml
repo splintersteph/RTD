@@ -2,11 +2,20 @@ services:
   - type: web
     name: planprod
     runtime: python
+    plan: starter   # obligatoire : un disque persistant n'est pas disponible sur le plan free
     buildCommand: pip install -r requirements.txt
     startCommand: python serveur.py
     envVars:
       - key: PORT
         value: 10000
+      - key: DATA_PATH
+        value: /var/data/donnees.json
+      # AUTH_USER et AUTH_PASS : à définir manuellement dans le dashboard Render
+      # (Settings > Environment), pas ici en clair dans le repo.
+    disk:
+      name: planprod-data
+      mountPath: /var/data
+      sizeGB: 1
 
 databases:
   - name: planprod-db
