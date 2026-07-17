@@ -139,9 +139,22 @@ function consoImportFile(input) {
 let consoSortField = 'couverture'; // couverture croissante par défaut = risques de rupture en premier
 let consoSearchFilter = '';
 let consoSelectedClient = null;
+let consoSelectedFamille = null; // niveau intermédiaire, uniquement pour RTD (Macro Ill XRO, Matchpost...)
 
 function consoSelectClient(client) {
   consoSelectedClient = client;
+  consoSelectedFamille = null;
+  consoSearchFilter = '';
+  renderConsoPage();
+}
+
+// Sélectionne directement une famille RTD depuis la vue d'ensemble (équivalent,
+// pour la couverture de stock, de "client final" côté Commandes — mais ici c'est
+// la famille de produits RTD qui a du sens, pas qui achète, puisqu'une même
+// référence peut être commandée par plusieurs clients finaux différents).
+function consoSelectFamille(famille) {
+  consoSelectedClient = 'RTD';
+  consoSelectedFamille = famille;
   consoSearchFilter = '';
   renderConsoPage();
 }
@@ -186,22 +199,32 @@ function renderConsoPage() {
   let headerExtra = '';
 
   if (!consoSelectedClient) {
-    // ── Vue d'ensemble : une tuile par client ───────────────────────────────
+    // ── Vue d'ensemble : clients OEM d'abord, puis toutes les familles RTD
+    // affichées directement (au lieu d'une seule carte "RTD" agrégée) — l'axe
+    // pertinent ici est la famille de produits (Macro Ill XRO, Matchpost...),
+    // pas le client final, car une même référence peut être vendue à plusieurs
+    // clients finaux différents : la couverture de stock se raisonne par
+    // référence/famille, pas par acheteur.
     const byClient = {};
     allRows.forEach(x => {
       const cl = x.r.client;
       (byClient[cl] = byClient[cl] || []).push(x);
     });
     const clients = Object.keys(byClient).sort();
+    const oemClients = clients.filter(cl => cl !== 'RTD');
+    const FAM_COLORS = (typeof RTD_FAM_COLORS !== 'undefined') ? RTD_FAM_COLORS : {};
 
-    mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
-    clients.forEach(cl => {
-      const col = CLIENT_COLORS[cl] || COL_DEFAULT;
-      const groupRows = byClient[cl];
+    const sectionHeader = (label, count) =>
+      '<div style="display:flex;align-items:center;gap:10px;margin:22px 0 12px 0">'
+      + '<span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-faint);text-transform:uppercase">'+label+'</span>'
+      + (count!==undefined ? '<span style="font-size:10px;font-weight:700;background:var(--bg);color:var(--text-faint);padding:1px 7px;border-radius:20px;border:1px solid var(--border)">'+count+'</span>' : '')
+      + '<span style="flex:1;height:1px;background:var(--border)"></span>'
+      + '</div>';
+
+    const renderClientCard = (cl, groupRows, col, onclickAttr) => {
       const nbCritique = groupRows.filter(x => x.couverture !== null && x.couverture < 1).length;
       const nbSurveiller = groupRows.filter(x => x.couverture !== null && x.couverture >= 1 && x.couverture < 3).length;
-      mainContent +=
-        '<div onclick="consoSelectClient(\''+cl+'\')" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+      return '<div '+onclickAttr+' style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
         +' onmouseenter="this.style.background=\''+col.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
         +'<span style="font-size:14px;font-weight:700;color:'+col.text+';flex:1">'+cl+'</span>'
@@ -212,13 +235,41 @@ function renderConsoPage() {
         +(nbSurveiller?'<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FEF5E7;color:#633806">'+nbSurveiller+' &lt; 3 mois</span>':'')
         +(!nbCritique&&!nbSurveiller?'<span style="font-size:10px;color:var(--text-faint)">Couvert</span>':'')
         +'</div></div>';
-    });
-    mainContent += '</div>';
+    };
+
+    if (oemClients.length) {
+      mainContent += sectionHeader('Clients OEM', oemClients.length);
+      mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
+      oemClients.forEach(cl => {
+        const col = CLIENT_COLORS[cl] || COL_DEFAULT;
+        mainContent += renderClientCard(cl, byClient[cl], col, 'onclick="consoSelectClient(\''+cl+'\')"');
+      });
+      mainContent += '</div>';
+    }
+
+    if (byClient['RTD']) {
+      const byFamille = {};
+      byClient['RTD'].forEach(x => {
+        const fam = x.r.famille || 'Autre';
+        (byFamille[fam] = byFamille[fam] || []).push(x);
+      });
+      const familles = Object.keys(byFamille).sort();
+      mainContent += sectionHeader('RTD — par famille', familles.length);
+      mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
+      familles.forEach(fam => {
+        const col = FAM_COLORS[fam] || COL_DEFAULT;
+        mainContent += renderClientCard(fam, byFamille[fam], col, 'onclick="consoSelectFamille(\''+fam.replace(/'/g,"\\'")+'\')"');
+      });
+      mainContent += '</div>';
+    }
 
   } else {
-    // ── Vue détail : références du client sélectionné ───────────────────────
-    const col = CLIENT_COLORS[consoSelectedClient] || COL_DEFAULT;
-    let rows = allRows.filter(x => x.r.client === consoSelectedClient);
+    // ── Vue détail : références du client (ou de la famille RTD) sélectionné(e)
+    const FAM_COLORS = (typeof RTD_FAM_COLORS !== 'undefined') ? RTD_FAM_COLORS : {};
+    const col = consoSelectedFamille ? (FAM_COLORS[consoSelectedFamille] || COL_DEFAULT)
+      : (CLIENT_COLORS[consoSelectedClient] || COL_DEFAULT);
+    let rows = allRows.filter(x => x.r.client === consoSelectedClient
+      && (!consoSelectedFamille || x.r.famille === consoSelectedFamille));
 
     const search = consoSearchFilter.toLowerCase();
     if (search) {
@@ -285,6 +336,7 @@ function renderConsoPage() {
     + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
     + '<h2 style="font-size:17px;font-weight:600"><i class="ti ti-trending-up" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Ventes &amp; couverture</h2>'
     + (consoSelectedClient ? '<button class="btn" onclick="consoSelectClient(null)" style="font-size:11px;padding:4px 10px"><i class="ti ti-arrow-left"></i> Tous les clients</button>' : '')
+    + (consoSelectedClient ? '<span style="font-size:13px;font-weight:700;color:'+((typeof RTD_FAM_COLORS!=='undefined'&&consoSelectedFamille&&RTD_FAM_COLORS[consoSelectedFamille])?RTD_FAM_COLORS[consoSelectedFamille].text:((typeof PDP_CLIENT_COLORS!=='undefined'&&PDP_CLIENT_COLORS[consoSelectedClient])?PDP_CLIENT_COLORS[consoSelectedClient].text:'var(--accent)'))+'">'+(consoSelectedFamille || consoSelectedClient)+'</span>' : '')
     + headerExtra
     + '<div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center">'
     + (nbCritiqueGlobal ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FCEBEB;color:#A32D2D"><i class="ti ti-alert-circle" style="vertical-align:-2px;margin-right:4px"></i>${nbCritiqueGlobal} &lt; 1 mois</span>` : '')
