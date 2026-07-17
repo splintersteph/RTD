@@ -149,6 +149,16 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Ouvre directement le détail d'une commande depuis un autre onglet (ex: tuile
+// PDP) sans passer par le rendu de la page Commandes au préalable — peuple le
+// cache _cdeCurrentRows avec toutes les lignes ouvertes (même source que le mode
+// chrono, cdeGetAllOpenLines) puis délègue à cdeShowOrderDetail. La modale étant
+// autonome, il n'est pas nécessaire de changer d'onglet.
+function cdeGotoOrder(numCmd) {
+  _cdeCurrentRows = cdeGetAllOpenLines();
+  cdeShowOrderDetail(numCmd);
+}
+
 function cdeSearch(val) {
   cdeSearchFilter = val;
   clearTimeout(_cdeSearchTimer);

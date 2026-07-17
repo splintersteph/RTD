@@ -1063,7 +1063,11 @@ function pdpShowDetail(code_client) {
 
   const cmdsHtml = cmds.length
     ? '<table class="cat-table" style="width:100%"><thead><tr><th>N° Cde</th><th>Client</th><th style="text-align:right">Cdé</th><th style="text-align:right">Livré</th><th style="text-align:right">Restant</th><th>Livraison</th></tr></thead><tbody>'
-      + cmds.map(c => '<tr>'
+      + cmds.map(c => '<tr'
+        + (typeof cdeGotoOrder === 'function'
+            ? ' onclick="closeOverlay();setTimeout(()=>cdeGotoOrder(\''+c.numCmd.replace(/'/g,"\\'")+'\'),50)" style="cursor:pointer" title="Voir le détail de cette commande"'
+            : '')
+        + '>'
         + '<td style="font-size:11px;font-family:monospace;color:var(--accent)">'+c.numCmd+'</td>'
         + '<td style="font-size:12px">'+c.client+'</td>'
         + '<td style="text-align:right;font-size:12px">'+c.qteCde.toLocaleString('fr')+'</td>'
