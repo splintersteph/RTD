@@ -366,13 +366,16 @@ function renderConsoPage() {
         const style = consoCouvertureStyle(x.couverture);
         const yoyStyle = consoFmtYoYStyle(x.yoy);
         const yoyIcon = (x.yoy !== null && x.yoy !== undefined) ? (x.yoy > 0 ? 'ti-trending-up' : (x.yoy < 0 ? 'ti-trending-down' : 'ti-minus')) : '';
+        const yoyTitle = (x.entry && x.entry.qteAn1 !== undefined && x.entry.qteAn2 !== undefined)
+          ? `12 derniers mois : ${x.entry.qteAn1.toLocaleString('fr')} u.\n12 mois précédents : ${x.entry.qteAn2.toLocaleString('fr')} u.`
+          : 'Historique insuffisant pour comparer';
         mainContent += `<tr style="cursor:pointer" onclick="if(typeof pdpShowDetail==='function')pdpShowDetail('${x.r.code_client}')"
           onmouseenter="this.style.background='var(--accent-light)'" onmouseleave="this.style.background=''">
           <td><div style="font-size:13px;font-weight:600">${x.r.libelle_fg}</div><div style="font-size:10px;color:var(--text-faint);font-family:monospace">${x.r.code_client}</div></td>
           <td style="text-align:right;font-size:13px;font-weight:600">${x.stock.toLocaleString('fr')}</td>
           <td style="text-align:right;font-size:12px">${x.qteTotale!==null ? x.qteTotale.toLocaleString('fr') : '—'}</td>
           <td style="text-align:right;font-size:12px;color:var(--text-muted)">${x.moyenne!==null ? Math.round(x.moyenne).toLocaleString('fr') : '—'}</td>
-          <td style="text-align:right"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:${yoyStyle.bg};color:${yoyStyle.text}">${yoyIcon?`<i class="ti ${yoyIcon}" style="font-size:10px;vertical-align:-1px;margin-right:2px"></i>`:''}${consoFmtYoY(x.yoy)}</span></td>
+          <td style="text-align:right"><span title="${yoyTitle}" style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:${yoyStyle.bg};color:${yoyStyle.text};cursor:default">${yoyIcon?`<i class="ti ${yoyIcon}" style="font-size:10px;vertical-align:-1px;margin-right:2px"></i>`:''}${consoFmtYoY(x.yoy)}</span></td>
           <td style="text-align:right"><span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;background:${style.bg};color:${style.text}">${consoFmtMois(x.couverture)}</span></td>
         </tr>`;
       });
