@@ -23,6 +23,7 @@ const CONSO_DEFAULT = CONSO_DEFAULT_RAW.map(([ref, libelle, qte, nb]) => ({ref, 
 let consoImported = null;           // null = utilise CONSO_DEFAULT
 let consoImportedPeriodDays = null; // idem, en jours
 let consoImportedAsOf = null;       // date de référence ("aujourd'hui") utilisée au moment de l'import
+let consoImportedHistoryDays = null; // recul réel du fichier importé (peut être < 730j si l'export ne remonte pas si loin)
 
 function consoGetActive() {
   return {
@@ -74,6 +75,11 @@ function consoGetYoYPercent(code_client) {
   const entry = consoGetEntry(code_client);
   if (!entry || entry.qteAn1 === undefined || entry.qteAn2 === undefined) return null;
   if (!entry.qteAn2) return null; // division par zéro évitée : pas de référence l'an dernier
+  // Garde-fou : si la période de comparaison ("l'an dernier") ne contient que
+  // 1 ou 2 lignes de livraison, le pourcentage n'a aucune valeur statistique
+  // (une seule commande isolée peut faire varier le ratio de plusieurs milliers
+  // de %) — on préfère ne rien afficher plutôt qu'un chiffre trompeur.
+  if ((entry.nbAn2 || 0) < 3) return null;
   return ((entry.qteAn1 - entry.qteAn2) / entry.qteAn2) * 100;
 }
 
@@ -125,6 +131,7 @@ function consoImportFile(input) {
 
         const agg = {};
         let nbLignesRetenues = 0;
+        let earliestDate = null;
         json.forEach(r => {
           let d = r.DATE_BL;
           if (d && !(d instanceof Date)) d = new Date(d);
@@ -133,11 +140,12 @@ function consoImportFile(input) {
           const qte = Number(r.QTE_LIVREE)||0;
           if (!ref || qte <= 0) return;
           const libelle = String(r.LIBELL||'').trim();
-          if (!agg[ref]) agg[ref] = {ref, libelle, qte:0, nb:0, qteAn1:0, qteAn2:0};
+          if (!agg[ref]) agg[ref] = {ref, libelle, qte:0, nb:0, qteAn1:0, qteAn2:0, nbAn1:0, nbAn2:0};
           agg[ref].qte += qte;
           agg[ref].nb += 1;
-          if (d >= midCutoff) agg[ref].qteAn1 += qte; // 12 derniers mois
-          else agg[ref].qteAn2 += qte;                // 12 mois précédents
+          if (d >= midCutoff) { agg[ref].qteAn1 += qte; agg[ref].nbAn1 += 1; } // 12 derniers mois
+          else { agg[ref].qteAn2 += qte; agg[ref].nbAn2 += 1; }               // 12 mois précédents
+          if (!earliestDate || d < earliestDate) earliestDate = d;
           nbLignesRetenues++;
         });
 
@@ -147,8 +155,17 @@ function consoImportFile(input) {
         consoImported = Object.values(agg);
         consoImportedPeriodDays = 730;
         consoImportedAsOf = today.toISOString().slice(0,10);
+        // Historique réellement couvert par le fichier — sert à savoir si la
+        // comparaison A/A (qui suppose 2 ans pleins) est fiable ou non.
+        consoImportedHistoryDays = earliestDate ? Math.round((today - earliestDate) / 86400000) : 0;
 
-        if (typeof showToast === 'function') showToast(`Ventes importées : ${nbRefs} références, ${nbLignesRetenues} livraisons (2 ans glissants jusqu'au ${consoImportedAsOf})`);
+        if (typeof showToast === 'function') {
+          showToast(`Ventes importées : ${nbRefs} références, ${nbLignesRetenues} livraisons (2 ans glissants jusqu'au ${consoImportedAsOf})`);
+          if (consoImportedHistoryDays < 550) { // moins de ~18 mois de recul réel
+            const moisCouverts = Math.round(consoImportedHistoryDays / 30.4375);
+            setTimeout(() => showToast(`Attention : ce fichier ne couvre que ${moisCouverts} mois d'historique réel — l'évolution A/A ne sera pas affichée sur les références sans assez de recul l'an dernier.`), 3500);
+          }
+        }
 
         if (typeof render === 'function') render();
         if (typeof currentView !== 'undefined' && currentView === 'conso' && typeof renderConsoPage === 'function') renderConsoPage();
