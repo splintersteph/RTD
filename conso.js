@@ -8,7 +8,8 @@
 // PAS au niveau codart_wip (le tenon brut). Le rythme de PRODUCTION (consommation
 // de tenons) n'est pas le rythme de VENTE — seules les livraisons réelles au
 // niveau produit fini représentent la demande client. Source : COMMANDELIST.XLSX,
-// colonne QTE_LIVREE (quantité livrée) agrégée par REF_RTD sur les livraisons
+// colonne QTE_LIVRE2 (quantité livrée, INCRÉMENTALE par ligne de bon de
+// livraison) agrégée par REF_RTD sur les livraisons
 // dont DATE_BL tombe dans les 2 dernières années glissantes.
 // ═══════════════════════════════════════════════════════════
 
@@ -108,7 +109,7 @@ function consoFmtYoYStyle(pct) {
 
 // ── Import d'un export COMMANDELIST plus récent (remplace CONSO_DEFAULT) ───────
 // Filtre sur les 2 dernières années glissantes par rapport à AUJOURD'HUI au moment
-// de l'import (pas une date figée) — colonnes attendues : REF_RTD, QTE_LIVREE,
+// de l'import (pas une date figée) — colonnes attendues : REF_RTD, QTE_LIVRE2,
 // DATE_BL, LIBELL (mêmes noms que l'export ERP "COMMANDELIST").
 function consoImportFile(input) {
   const file = input.files && input.files[0];
@@ -137,7 +138,7 @@ function consoImportFile(input) {
           if (d && !(d instanceof Date)) d = new Date(d);
           if (!(d instanceof Date) || isNaN(d) || d < cutoff || d > today) return;
           const ref = String(r.REF_RTD||'').trim();
-          const qte = Number(r.QTE_LIVREE)||0;
+          const qte = Number(r.QTE_LIVRE2)||0;
           if (!ref || qte <= 0) return;
           const libelle = String(r.LIBELL||'').trim();
           if (!agg[ref]) agg[ref] = {ref, libelle, qte:0, nb:0, qteAn1:0, qteAn2:0, nbAn1:0, nbAn2:0};
@@ -150,7 +151,7 @@ function consoImportFile(input) {
         });
 
         const nbRefs = Object.keys(agg).length;
-        if (!nbRefs) { if (typeof showToast === 'function') showToast('Aucune ligne REF_RTD/QTE_LIVREE/DATE_BL reconnue sur les 2 dernières années dans ce fichier.'); return; }
+        if (!nbRefs) { if (typeof showToast === 'function') showToast('Aucune ligne REF_RTD/QTE_LIVRE2/DATE_BL reconnue sur les 2 dernières années dans ce fichier.'); return; }
 
         consoImported = Object.values(agg);
         consoImportedPeriodDays = 730;
