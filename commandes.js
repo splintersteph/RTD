@@ -714,7 +714,20 @@ function renderCommandesPage() {
         corrByCode[r.code_client] = r;
       });
 
-      (pcData.commandes||[]).forEach(c => {
+      // Même dédup que cdeGetAllOpenLines/cdeGetForRef (voir leurs commentaires) :
+      // une ligne de commande livrée en plusieurs BL partiels apparaît plusieurs
+      // fois dans l'export brut avec les mêmes QTE_CDE/QTE_LIVREE (des totaux de
+      // ligne, pas des quantités par BL) — sans ça, une commande s'affichait en
+      // double dans cette vue "client final RTD" précisément.
+      const seenLignesRTD = new Set();
+      const dedupedCommandesRTD = (pcData.commandes||[]).filter(c => {
+        const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+        if (seenLignesRTD.has(key)) return false;
+        seenLignesRTD.add(key);
+        return true;
+      });
+
+      dedupedCommandesRTD.forEach(c => {
         const clientLabel = String(c.LIBFOU||c.CODCLI||'').trim() || 'Client non renseigné';
         if (clientLabel !== cdeSelectedFinalClient) return;
         const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);

@@ -700,7 +700,20 @@ function pdpCalcRupture(fgCodeOrWip, stockDispo) {
   // soit un WIP → on essaie de résoudre mais sans ambiguïté via la nomenclature
   let fgCode = fgCodeOrWip;
 
-  const cmdsOuvertes = pcData.commandes
+  // Dédup par ligne de commande (NUM_COM+LIGNE_COM) — voir le même correctif
+  // dans cdeGetAllOpenLines/cdeGetForRef (commandes.js) et pdpShowDetail
+  // ci-dessus. Sans ça, une ligne livrée en plusieurs BL partiels soustrayait
+  // son restant plusieurs fois du stock disponible dans cette simulation FIFO,
+  // avançant artificiellement la date de rupture calculée.
+  const seenLignesRupture = new Set();
+  const dedupedCommandesRupture = pcData.commandes.filter(r => {
+    const key = String(r.NUM_COM||'') + '|' + String(r.LIGNE_COM||'');
+    if (seenLignesRupture.has(key)) return false;
+    seenLignesRupture.add(key);
+    return true;
+  });
+
+  const cmdsOuvertes = dedupedCommandesRupture
     .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
     .map(r => ({
       qteRest: (Number(r.QTE_CDE)||0) - (Number(r.QTE_LIVREE)||0),

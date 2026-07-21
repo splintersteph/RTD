@@ -22,6 +22,20 @@ function renderBesoinsPage() {
     return;
   }
 
+  // Dédup par ligne de commande (NUM_COM+LIGNE_COM) — même correctif que dans
+  // cdeGetAllOpenLines/cdeGetForRef (commandes.js) et pdpShowDetail/pdpCalcRupture
+  // (pdp.js) : une ligne de commande livrée en plusieurs bons de livraison
+  // partiels apparaît plusieurs fois dans l'export ERP avec les mêmes
+  // QTE_CDE/QTE_LIVREE (des totaux de LIGNE, pas des quantités par BL). Calculé
+  // une seule fois ici et réutilisé pour toutes les références de la page.
+  const seenLignesBesoins = new Set();
+  const dedupedCommandesBesoins = (typeof pcData !== 'undefined' ? (pcData.commandes||[]) : []).filter(c => {
+    const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+    if (seenLignesBesoins.has(key)) return false;
+    seenLignesBesoins.add(key);
+    return true;
+  });
+
   // ── Pour chaque référence, calculer stock FG total + commandes + rupture
   const items = [];
 
@@ -49,9 +63,10 @@ function renderBesoinsPage() {
       ? pdpGetTotalFGForRef(r.codart_wip, r.code_client)
       : 0;
 
-    // Commandes ouvertes (sur le code FG final)
+    // Commandes ouvertes (sur le code FG final) — à partir des lignes déjà
+    // dédupliquées plus haut (dedupedCommandesBesoins).
     const fgCode = r.code_client;
-    const cmds = (typeof pcData !== 'undefined' ? (pcData.commandes || []) : [])
+    const cmds = dedupedCommandesBesoins
       .filter(c => String(c.REF_RTD || '').trim() === fgCode && String(c.COMMANDE_S||'').trim() !== 'O')
       .map(c => ({
         numCmd: String(c.NUM_COM || ''),
