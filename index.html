@@ -3346,9 +3346,21 @@ function pcCalcStock(codeLouxor) {
     .reduce((s,r) => s + (Number(r.QTEEMP)||0), 0);
 }
 
-function pcCalcOF(fg) {
+function pcCalcOF(fg, codeLouxor) {
+  // Cherche par fg ET par codeLouxor (pas l'un OU l'autre en priorité stricte) :
+  // certaines références ont un code de suivi "en cours" (fg) différent de leur
+  // code de stock (codeLouxor) dans l'ERP — ex: CORECEM_9G/5ML (stock) suivi en
+  // production sous 1410120 (fg). D'autres, comme QS_UD_80MM, utilisent le même
+  // code aux deux endroits, et la ligne Correspondances n'a jamais eu besoin de
+  // remplir fg séparément. Sans ce filtre à deux clés, ces dernières lignes
+  // affichaient 0 en cours alors que l'OF existait bien dans le fichier importé.
+  const fgStr = String(fg||'').trim();
+  const codeStr = String(codeLouxor||'').trim();
   return pcData.ofEnCours
-    .filter(r => String(r.CODART||'').trim() === String(fg||'').trim())
+    .filter(r => {
+      const art = String(r.CODART||'').trim();
+      return (fgStr && art === fgStr) || (codeStr && art === codeStr);
+    })
     .reduce((s,r) => s + (Number(r.QTEPRE)||0), 0);
 }
 
@@ -3370,7 +3382,7 @@ function pcCalcRows() {
     const fg         = String(c.fg||'').trim();
     const client     = String(c.client||'').trim();
     const stockWIP   = pcCalcStock(codeLouxor);
-    const qteEnCours = pcCalcOF(fg);
+    const qteEnCours = pcCalcOF(fg, codeLouxor);
     const stockVenir = stockWIP + qteEnCours;
     const commandes  = pcCalcCommandes(fg, client);
     const stockRest  = stockVenir - commandes;
