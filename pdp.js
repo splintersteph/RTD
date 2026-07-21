@@ -676,7 +676,10 @@ function pdpToISODate(val) {
   if (!val) return null;
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return null;
-    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    // Getters UTC (pas locaux) — voir le même correctif dans cdeToISODate
+    // (commandes.js) : SheetJS construit les dates Excel en UTC minuit, les
+    // relire en local peut décaler d'un jour selon le fuseau horaire.
+    const y = val.getUTCFullYear(), m = String(val.getUTCMonth()+1).padStart(2,'0'), d = String(val.getUTCDate()).padStart(2,'0');
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();

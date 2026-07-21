@@ -134,7 +134,11 @@ function cdeToISODate(val) {
   if (!val) return null;
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return null;
-    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    // Getters UTC (pas locaux) : SheetJS construit les dates Excel en UTC minuit
+    // (cellDates:true) — les relire avec des getters locaux peut décaler la date
+    // d'un jour selon le fuseau horaire du navigateur. Une date Excel n'a pas de
+    // fuseau horaire propre, donc on reste en UTC de bout en bout.
+    const y = val.getUTCFullYear(), m = String(val.getUTCMonth()+1).padStart(2,'0'), d = String(val.getUTCDate()).padStart(2,'0');
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();
