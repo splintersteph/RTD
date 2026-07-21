@@ -26,10 +26,11 @@ function stockGetDisponible(codart) {
     .reduce((s,r) => s + (Number(r.QTEEMP)||0), 0);
 }
 
+// Même restriction que pdpGetEnCoursForWip/nomGetEnCours (index.html) : l'import
+// ERP "OF en cours" est réservé à Planning Composite pour le moment, retourne 0
+// ici (Stock : panneau détail + calculateur de commande).
 function stockGetEnCoursProd(codart) {
-  return (pcData.ofEnCours||[])
-    .filter(r => String(r.CODART||'').trim() === codart)
-    .reduce((s,r) => s + (Number(r.QTEPRE)||0), 0);
+  return 0;
 }
 
 

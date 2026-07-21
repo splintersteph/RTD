@@ -624,7 +624,13 @@ setInterval(async()=>{
     }
     objectifs3m=d.objectifs_3m||objectifs3m;
     if(d.pc_data && typeof pcData!=='undefined'){
-      pcData = Object.assign({stock:[],commandes:[],ofEnCours:[],lastImport:{}}, d.pc_data, {ofEnCours:[]});
+      // ofEnCours n'est jamais sauvegardé côté serveur (exclu à la demande de
+      // Stéphane), donc d.pc_data ne le contient jamais — on préserve la valeur
+      // déjà en mémoire au lieu de la réinitialiser à [] à chaque poll (ce qui
+      // effaçait silencieusement un import fait il y a moins de 30s, avant même
+      // que l'utilisateur ait eu le temps de le consulter).
+      const keepOfEnCours = pcData.ofEnCours || [];
+      pcData = Object.assign({stock:[],commandes:[],ofEnCours:[],lastImport:{}}, d.pc_data, {ofEnCours:keepOfEnCours});
     }
     if(d.extra_data){
       const ex = d.extra_data;
@@ -3638,10 +3644,12 @@ function pdpGetStockForZone(codart, zones) {
     .reduce((s,r) => s + (Number(r.QTEEMP)||0), 0);
 }
 
+// Ancien comportement : lisait pcData.ofEnCours (import ERP "OF en cours").
+// Depuis le [date], cet import est réservé à l'onglet Planning Composite
+// uniquement (pcCalcOF) — décision de Stéphane, "pour le moment". Le PDP ne
+// compte donc plus d'en-cours ici ; retourne toujours 0.
 function pdpGetEnCoursForWip(codart) {
-  return (pcData.ofEnCours || [])
-    .filter(r => String(r.CODART||'').trim() === codart)
-    .reduce((s,r) => s + (Number(r.QTEPRE)||0), 0);
+  return 0;
 }
 
 function pdpGetCommandesForRef(codartWip) {
@@ -3696,10 +3704,10 @@ function nomGetStock(codart) {
 }
 
 // ── Calcul en-cours production pour une étape
+// Même restriction que pdpGetEnCoursForWip ci-dessus : l'import "OF en cours"
+// est réservé à Planning Composite, ce calcul ne l'utilise plus.
 function nomGetEnCours(codart) {
-  return pcData.ofEnCours
-    .filter(r => String(r.CODART||'').trim() === codart)
-    .reduce((s,r) => s + (Number(r.QTEPRE)||0), 0);
+  return 0;
 }
 
 // ── Calculer l'équivalent en produits finis d'un stock à une étape donnée
