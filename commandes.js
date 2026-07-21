@@ -62,7 +62,20 @@ function cdeGetAllOpenLines() {
     : (typeof PDP_CORRESPONDANCES !== 'undefined' ? PDP_CORRESPONDANCES : []);
   const corrByCode = {};
   corrs.forEach(r => { corrByCode[r.code_client] = r; });
-  return (pcData.commandes||[]).map(c => {
+  // Dédupliquer par ligne de commande (NUM_COM+LIGNE_COM) : une même ligne de
+  // commande apparaît une fois par bon de livraison partiel dans l'export ERP,
+  // avec QTE_CDE/QTE_LIVREE identiques à chaque fois (ce sont des totaux de
+  // LIGNE, pas des quantités par BL — voir le même constat fait sur
+  // QTE_LIVREE/QTE_LIVRE2 dans conso.js). Sans dédup, une ligne livrée en 2 BL
+  // apparaît 2 fois à l'identique dans le tableau.
+  const seen = new Set();
+  const dedupedRows = (pcData.commandes||[]).filter(c => {
+    const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return dedupedRows.map(c => {
     const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
     if (qteRest <= 0) return null;
     if (String(c.COMMANDE_S||'').trim() === 'O') return null; // "Soldée" côté ERP : à ignorer même si un restant apparaît
@@ -113,7 +126,16 @@ function cdeResolveToFG(ref, code_client) {
 // "Soldée : Oui" avec un restant non nul — COMMANDE_S semble correspondre à ce
 // vrai statut "Soldée" de l'ERP, contrairement à LIGNE_CDE_).
 function cdeGetForRef(fgCode) {
-  return (pcData.commandes||[])
+  // Même dédup que cdeGetAllOpenLines (voir commentaire là-bas) : une ligne
+  // livrée en plusieurs BL partiels ne doit compter qu'une fois.
+  const seen = new Set();
+  const dedupedRows = (pcData.commandes||[]).filter(c => {
+    const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return dedupedRows
     .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
     .map(r => ({
       numCmd:  String(r.NUM_COM||''),

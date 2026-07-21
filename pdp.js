@@ -1019,7 +1019,18 @@ function pdpShowDetail(code_client) {
   // Code FG pour les commandes : utiliser directement code_client (c'est le FG connu)
   // au lieu de remonter la nomenclature (qui peut trouver un autre FG partageant le même WIP)
   const fgCode = code_client;
-  const cmds = (typeof pcData !== 'undefined' ? (pcData.commandes||[]) : [])
+  // Dédup par ligne de commande (NUM_COM+LIGNE_COM) — voir le même correctif et
+  // la même explication dans cdeGetAllOpenLines/cdeGetForRef (commandes.js) :
+  // sans ça, une ligne livrée en plusieurs BL partiels apparaît en double ici
+  // ET fausse le calcul de rupture FIFO plus bas (double comptage du restant).
+  const seenLignes = new Set();
+  const dedupedCmds = (typeof pcData !== 'undefined' ? (pcData.commandes||[]) : []).filter(r => {
+    const key = String(r.NUM_COM||'') + '|' + String(r.LIGNE_COM||'');
+    if (seenLignes.has(key)) return false;
+    seenLignes.add(key);
+    return true;
+  });
+  const cmds = dedupedCmds
     .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
     .map(r => ({
       numCmd: String(r.NUM_COM||''),
