@@ -3603,10 +3603,15 @@ function pdpGetStockForWip(codart) {
     'ZQUAL',   // Qualité
     'ZREBUT',  // Zone pour la destruction
   ];
-  // Zones réservées à un client à zone dédiée pour CE codart précis (ex: le stock de
-  // BLISTER_W41_MDR dans BSRTD1 est réservé à Chaoran) — exclues du calcul général
-  // pour ne pas compter la même marchandise comme disponible pour tout le monde.
-  const reserved = (typeof pdpGetReservedZonesMap === 'function') ? pdpGetReservedZonesMap()[codart] : null;
+  // Les zones réservées à un client dédié (CLIENT_STOCK_ZONES, ex: BSRTD1 pour
+  // Chaoran) ne sont PLUS exclues ici. Ce stock est bien physiquement présent :
+  // la vue générale (tuile PDP non filtrée par client) doit refléter le vrai
+  // total, réservations comprises. L'exclusion par zone reste appliquée
+  // uniquement quand on calcule le disponible pour UN AUTRE client précis, via
+  // pdpGetStockForZone (whitelist explicite des zones de ce client — n'a pas
+  // besoin de cette liste de réservations, donc rien à changer là-bas).
+  // Décision confirmée par Stéphane le 22/07/2026, suite à un écart constaté
+  // entre le total ERP réel et la tuile PDP sur AE2 ILL XRO / 45900502BV.
 
   return (pcData.stock || [])
     .filter(r => {
@@ -3614,7 +3619,6 @@ function pdpGetStockForWip(codart) {
       const empl = String(r.EMPLAC||'').trim();
       if (art !== codart) return false;
       if (EMPL_EXCLUS.includes(empl)) return false;
-      if (reserved && reserved.has(empl)) return false;
       return true;
     })
     .reduce((s,r) => s + (Number(r.QTEEMP)||0), 0);
