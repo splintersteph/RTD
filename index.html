@@ -608,6 +608,41 @@ function scheduleSave() {
   },800);
 }
 
+// Exécute fn() (un re-render) en préservant la position de défilement de toutes
+// les zones actuellement scrollées (colonnes Kanban, listes, conteneurs internes
+// des onglets PDP/Besoins/Conso/etc.) — sans ça, la synchronisation automatique
+// (toutes les 30s, voir setInterval plus bas) ramenait l'utilisateur en haut de
+// la page en pleine lecture, puisque render() remplace le HTML de la vue active.
+// Approche générique (pas de sélecteur figé par vue) : repère chaque zone
+// défilée par sa classe + sa position parmi ses frères de même classe, ce qui
+// reste stable d'un render à l'autre tant que la structure ne change pas (cas
+// normal ici, même fonction de rendu régénérant le même gabarit).
+function preserveScroll(fn) {
+  const root = document.getElementById('main-content') || document.body;
+  const isScrollable = el => {
+    const cs = getComputedStyle(el);
+    return cs.overflowY === 'auto' || cs.overflowY === 'scroll';
+  };
+  const keyOf = el => el.className + '|' + Array.from(el.parentNode ? el.parentNode.children : [])
+    .filter(c => c.className === el.className).indexOf(el);
+
+  const saved = Array.from(root.querySelectorAll('*'))
+    .filter(el => isScrollable(el) && el.scrollTop > 0)
+    .map(el => ({ key: keyOf(el), top: el.scrollTop }));
+
+  fn();
+
+  if (saved.length) {
+    requestAnimationFrame(() => {
+      const after = Array.from(root.querySelectorAll('*')).filter(isScrollable);
+      saved.forEach(s => {
+        const match = after.find(el => keyOf(el) === s.key);
+        if (match) match.scrollTop = s.top;
+      });
+    });
+  }
+}
+
 setInterval(async()=>{
   if (!serverAvailable) return;
   try {
@@ -654,7 +689,7 @@ setInterval(async()=>{
       // Ne pas re-render les stats archives automatiquement
       return;
     }
-    render();
+    preserveScroll(render);
   } catch {}
 },30000);
 
