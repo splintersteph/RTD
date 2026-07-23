@@ -1171,7 +1171,8 @@ function debounceArchiveSearch() {
 
 function renderArchives(){
   const av=document.getElementById('archive-view');
-  if(!archives.length){av.innerHTML='<div class="empty"><i class="ti ti-archive"></i>Aucun OF archivé</div>';return;}
+  const importBtn = '<label class="btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-file-import"></i> Importer CRTenons<input type="file" accept=".xls,.xlsx" style="display:none" onchange="crtenonsImport(this)"></label>';
+  if(!archives.length){av.innerHTML=`<div class="empty"><i class="ti ti-archive"></i>Aucun OF archivé<div style="margin-top:14px">${importBtn}</div></div>`;return;}
   const archiveTab = document.getElementById('archive-tab')?.value || 'liste';
   if(archiveTab==='stats'){renderArchiveStats();return;}
   const searchA=(document.getElementById('search-archive')?.value||'').toLowerCase();
@@ -1218,6 +1219,7 @@ function renderArchives(){
         <option value="sans_controle" ${confF==='sans_controle'?'selected':''}>Sans contrôle</option>
       </select>
       <span style="font-size:12px;color:var(--text-muted);margin-left:auto">${data.length} / ${archives.length}</span>
+      ${importBtn}
     </div>
     <div style="overflow-x:auto;flex:1">
       <div style="display:grid;grid-template-columns:90px 72px 1fr 80px 78px 78px 68px 58px 72px 62px 52px 32px;gap:6px;padding:7px 12px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;min-width:900px;letter-spacing:.04em">
@@ -2481,6 +2483,108 @@ function moveStage(id,dir){
   o.stageEnteredAt[o.stage]=todayStr();
   addESATNote(o);
   closeOverlay();render();scheduleSave();
+}
+
+// Import de l'extract CRTenons (contrôle qualité tenons) vers les archives.
+// Colonnes lues par INDEX (pas par nom d'en-tête) : le fichier source a des
+// coquilles dans certains intitulés (ex: "Controlés" sans accent) — lire par
+// position est plus robuste qu'un matching de texte exact.
+// A=0 MOIS DE CTRL, B=1 MOIS DE FAB, C=2 N° OF, D=3 machine, E=4 Niveau de
+// contrôle, F=5 Date Réception, G=6 forme, H=7 PRODUITS, I=8 N° LOT TENONS,
+// J=9 N° LOT JONCS, K=10 Qté tenons fabriqués, L=11 Qté tenons Contrôlés,
+// M=12 Qté tenons conformes.
+// Deux exclusions demandées par Stéphane (22/07/2026), à la place d'une
+// détection de surlignage jaune Excel (peu fiable côté navigateur avec la
+// librairie XLSX utilisée ici) :
+//  1. OF déjà actif dans le Kanban (suivi manuel) — pas encore terminé, ne
+//     doit pas être archivé par-dessus.
+//  2. Date après fin juin de l'année en cours — les OF de juillet et plus
+//     tard ne sont pas encore stabilisés/contrôlés dans l'extract.
+// CRTenons ne fournit que les données de CONTRÔLE QUALITÉ (qty_fab/qty_ctrl/
+// qty_conf) — pas date_besoin/qty commandée/date_fin_theo/duree_theo_h, qui
+// viennent d'un import KPI séparé. Donc : fusion par n° d'OF dans une archive
+// KPI déjà existante quand elle existe (complète les champs qualité sans
+// écraser les champs KPI) ; sinon création d'une archive partielle avec
+// uniquement ce que CRTenons fournit.
+function crtenonsImport(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const doImport = () => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        const year = String(new Date().getFullYear());
+        const sheetName = wb.SheetNames.includes(year) ? year : wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        // header:1 -> tableaux indexés par colonne plutôt qu'objets par nom
+        // d'en-tête ; range:1 -> saute la ligne d'en-tête (ligne 1)
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, range:1, defval:null});
+
+        const cutoff = new Date(new Date().getFullYear(), 5, 30); // 30 juin de l'année en cours
+        const activeOfIds = new Set(ofs.map(o => String(o.id).replace('OF-','').trim()));
+
+        let nbCrees = 0, nbCompletes = 0, nbIgnoresActifs = 0, nbIgnoresDate = 0, nbIgnoresVides = 0;
+
+        rows.forEach(r => {
+          const ofNum = String(r[2]||'').trim();
+          if (!ofNum) { nbIgnoresVides++; return; }
+
+          if (activeOfIds.has(ofNum)) { nbIgnoresActifs++; return; }
+
+          let d = r[5];
+          if (d && !(d instanceof Date)) d = new Date(d);
+          const dOk = (d instanceof Date && !isNaN(d));
+          if (dOk && d > cutoff) { nbIgnoresDate++; return; }
+
+          const id = 'OF-' + ofNum;
+          const machine = String(r[3]||'').trim();
+          const produit = String(r[7]||'').trim();
+          const moisFab = String(r[1]||'').trim().toLowerCase();
+          const qtyFab = Number(r[10])||null;
+          const qtyCtrl = Number(r[11])||null;
+          const qtyConf = Number(r[12])||null;
+          const dateISO = dOk ? d.toISOString().slice(0,10) : null;
+
+          const existing = archives.find(a => String(a.of) === ofNum);
+          if (existing) {
+            existing.qty_fab = qtyFab;
+            existing.qty_ctrl = qtyCtrl;
+            existing.qty_conf = qtyConf;
+            existing.valide_controle = true;
+            if (!existing.machine && machine) existing.machine = machine;
+            nbCompletes++;
+          } else {
+            archives.unshift({
+              id, of: Number(ofNum)||ofNum,
+              produit, designation_kpi: produit, machine,
+              mois: '', mois_fab: moisFab,
+              date: dateISO, date_besoin: null, date_fin_theo: null,
+              archivedAt: dateISO,
+              duree_theo_h: null, ecart_j: null, conforme_delai: null,
+              qty: qtyFab, qty_fab: qtyFab, qty_ctrl: qtyCtrl, qty_conf: qtyConf,
+              prio: 'normale', note: 'Import CRTenons (sans données KPI — date_besoin/qty commandée/durée théorique inconnues)',
+              stage: 'boite', valide_controle: true,
+            });
+            nbCrees++;
+          }
+        });
+
+        if (typeof showToast === 'function') {
+          showToast(`CRTenons : ${nbCrees} archive(s) créée(s), ${nbCompletes} complétée(s), ${nbIgnoresActifs} ignorée(s) (déjà au Kanban), ${nbIgnoresDate} ignorée(s) (après juin)`);
+        }
+        if (typeof renderArchives === 'function') renderArchives();
+        if (typeof scheduleSave === 'function') scheduleSave();
+      } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast('Erreur import CRTenons : ' + err.message);
+      }
+    };
+    if (typeof loadXLSXForPdp === 'function') loadXLSXForPdp(doImport);
+    else if (typeof XLSX !== 'undefined') doImport();
+    else console.error('XLSX non disponible et loadXLSXForPdp introuvable');
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function archiverOf(id){
