@@ -615,16 +615,35 @@ function cdeDevisImportFile(input) {
       try {
         const wb = XLSX.read(e.target.result, {type:'array'});
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, range:1, defval:null});
         const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+
+        // Colonnes candidates par nom d'en-tête, insensible à la casse — couvre
+        // à la fois les exports ERP bruts (CODART/QUANTI, ex: extraction Louxor
+        // DIYETAT) et des fichiers plus simples faits à la main (Référence/Qté).
+        const REF_HEADERS = ['codart','ref_rtd','référence','reference','code','codearticle',"code article"];
+        const QTY_HEADERS = ['quanti','qte','qte_cde','quantité','quantite','qty','quantitedemandee','quantité demandée'];
+
+        const headerRow = XLSX.utils.sheet_to_json(ws, {header:1, range:0, defval:null})[0] || [];
+        const normalize = h => String(h||'').trim().toLowerCase().replace(/\s+/g,'');
+        const refColIdx = headerRow.findIndex(h => REF_HEADERS.includes(normalize(h)));
+        const qtyColIdx = headerRow.findIndex(h => QTY_HEADERS.includes(normalize(h)));
+        const hasRecognizedHeaders = refColIdx !== -1 && qtyColIdx !== -1;
+
+        // Avec en-têtes reconnus : on saute la ligne d'en-tête (range:1) et on lit
+        // par index de colonne trouvé. Sans en-tête reconnu : ancien format simple
+        // colonne A = référence, colonne B = quantité (range:1 aussi, on suppose
+        // une ligne d'en-tête même non reconnue plutôt que de la lire comme donnée).
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, range:1, defval:null});
+        const useRefIdx = hasRecognizedHeaders ? refColIdx : 0;
+        const useQtyIdx = hasRecognizedHeaders ? qtyColIdx : 1;
 
         const newLines = [];
         let nbMatches = 0, nbSansMatch = 0;
 
         rows.forEach(r => {
-          const refText = String(r[0]||'').trim();
+          const refText = String(r[useRefIdx]||'').trim();
           if (!refText) return;
-          const qty = parseInt(r[1]) || 0;
+          const qty = parseInt(r[useQtyIdx]) || 0;
           const val = refText.toLowerCase();
 
           // Correspondance exacte d'abord (code_client ou codart_wip), sinon
@@ -636,10 +655,11 @@ function cdeDevisImportFile(input) {
           newLines.push({ id: _cdeDevisNextId++, ref: ref||null, refText: ref?ref.libelle_fg:refText, qty });
         });
 
-        if (!newLines.length) { if (typeof showToast==='function') showToast('Aucune ligne exploitable trouvée (colonne A = référence, colonne B = quantité).'); return; }
+        if (!newLines.length) { if (typeof showToast==='function') showToast('Aucune ligne exploitable trouvée. Colonnes attendues : CODART/Référence + QUANTI/Quantité (ou à défaut colonne A + colonne B).'); return; }
 
         cdeDevisLines = newLines;
-        if (typeof showToast === 'function') showToast(`Devis importé : ${newLines.length} ligne(s), ${nbMatches} référence(s) reconnue(s)${nbSansMatch?', '+nbSansMatch+' à choisir manuellement':''}.`);
+        const formatMsg = hasRecognizedHeaders ? ` (colonnes "${headerRow[refColIdx]}"/"${headerRow[qtyColIdx]}" détectées)` : '';
+        if (typeof showToast === 'function') showToast(`Devis importé${formatMsg} : ${newLines.length} ligne(s), ${nbMatches} référence(s) reconnue(s)${nbSansMatch?', '+nbSansMatch+' à choisir manuellement':''}.`);
         renderCommandesPage();
       } catch (err) {
         console.error(err);
