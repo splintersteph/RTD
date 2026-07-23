@@ -13,7 +13,7 @@ function stockGetDisponible(codart) {
   // pdpGetStockForWip (index.html) et pcCalcStock (index.html, Planning Composite).
   // Tout emplacement non listé ici compte comme stock disponible par défaut.
   const EMPL_EXCLUS = [
-    'CHARNC','ECONC','KATNC','NC','NCBLIS','QUALNC',
+    'CHARNC','ECHANT','ECONC','KATNC','NC','NCBLIS','QUALNC',
     'QUARCR','QUARCV','QUARKP','QUARLG','QUARLU','QUARPS','QUARQL','QUARSR',
     'SARNC','ZQUAL','ZREBUT',
   ];

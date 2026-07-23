@@ -3472,7 +3472,7 @@ function pcCalcStock(codeLouxor) {
   // du Planning Composite (HPREP1/2, BPREP1/2/3, zones export, etc.), tout comme
   // pdpGetStockForWip avant sa correction.
   const EMPL_EXCLUS = [
-    'CHARNC','ECONC','KATNC','NC','NCBLIS','QUALNC',
+    'CHARNC','ECHANT','ECONC','KATNC','NC','NCBLIS','QUALNC',
     'QUARCR','QUARCV','QUARKP','QUARLG','QUARLU','QUARPS','QUARQL','QUARSR',
     'SARNC','ZQUAL','ZREBUT',
   ];
@@ -3725,6 +3725,7 @@ function pdpGetStockForWip(codart) {
   // stockage qui n'aurait pas encore été ajoutée ici.
   const EMPL_EXCLUS = [
     'CHARNC',  // Non conforme OEM
+    'ECHANT',  // Échantillons
     'ECONC',   // Non conforme Ecoparc
     'KATNC',   // Non conforme composite
     'NC',      // Non conforme usinage
