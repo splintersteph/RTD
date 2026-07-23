@@ -565,6 +565,12 @@ function cdeDevisComputeLine(line) {
   return { stock, ok, manque: ok === false ? line.qty - stock : 0 };
 }
 
+function cdeDevisShowLineDetail(id) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line || !line.ref) return;
+  if (typeof pdpShowDetail === 'function') pdpShowDetail(line.ref.code_client);
+}
+
 function cdeDevisResultCellHtml(line) {
   const res = cdeDevisComputeLine(line);
   if (!line.ref) return '<span style="font-size:11px;color:var(--text-faint)">Choisir une référence…</span>';
@@ -578,7 +584,10 @@ function cdeDevisResultCellHtml(line) {
 function cdeDevisUpdateLineResult(id) {
   const line = cdeDevisLines.find(l => l.id === id);
   const cell = document.getElementById('devis-result-'+id);
-  if (line && cell) cell.innerHTML = cdeDevisResultCellHtml(line);
+  if (line && cell) {
+    cell.innerHTML = cdeDevisResultCellHtml(line);
+    cell.style.cursor = line.ref ? 'pointer' : '';
+  }
   cdeDevisUpdateSummary();
 }
 
@@ -696,7 +705,7 @@ function cdeDevisRenderSection() {
     + '<input type="number" min="1" placeholder="Quantité" value="'+(line.qty||'')+'" oninput="cdeDevisQtyChanged('+line.id+',this.value)" '
     + 'style="width:100%;padding:7px 9px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
     + '</td>'
-    + '<td id="devis-result-'+line.id+'" style="min-width:170px">'+cdeDevisResultCellHtml(line)+'</td>'
+    + '<td id="devis-result-'+line.id+'" onclick="cdeDevisShowLineDetail('+line.id+')" title="Voir le détail du stock et des commandes" style="min-width:170px;'+(line.ref?'cursor:pointer':'')+'">'+cdeDevisResultCellHtml(line)+'</td>'
     + '<td style="width:36px;text-align:center">'
     + '<button onclick="cdeDevisRemoveLine('+line.id+')" title="Retirer cette ligne" style="background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:15px;padding:4px"><i class="ti ti-trash"></i></button>'
     + '</td>'
