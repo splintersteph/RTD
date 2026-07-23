@@ -874,6 +874,17 @@ function _pdpSegmentOverlapScore(codart_wip, produitRaw) {
   return score;
 }
 
+// Nombre de segments distinctifs (hors segments génériques de procédé/matière)
+// d'un codart_wip — sert à départager une égalité de score : entre deux
+// candidats qui couvrent le même nombre de segments trouvés dans le produit
+// de l'OF, celui qui a le MOINS de segments distinctifs au total est mieux
+// confirmé (couverture complète) que celui qui en a plus (couverture partielle,
+// un segment manquant comme "BLANC" simplement absent du nom de l'OF).
+function _pdpSegmentCount(codart_wip) {
+  return String(codart_wip||'').toUpperCase().split(/[_\-\s]+/).filter(Boolean)
+    .filter(s => !_PDP_GENERIC_SEGMENTS.has(s)).length;
+}
+
 function _pdpLenVariant(str) {
   const segs = String(str||'').split(/[_\-\s]+/);
   const seg = segs.find(s => /^L\d{2,3}$/i.test(s));
@@ -927,7 +938,19 @@ function pdpGetOFsForRef(codart_wip, shortName) {
       if (!prod.includes(targetShort)) return false;
       const myScore = _pdpSegmentOverlapScore(codart_wip, o.produit);
       if (myScore <= 0) return false;
-      const beaten = [...candidates].some(c => c !== codart_wip && _pdpSegmentOverlapScore(c, o.produit) >= myScore);
+      const myTotal = _pdpSegmentCount(codart_wip);
+      const beaten = [...candidates].some(c => {
+        if (c === codart_wip) return false;
+        const cScore = _pdpSegmentOverlapScore(c, o.produit);
+        if (cScore > myScore) return true;
+        if (cScore < myScore) return false;
+        // Égalité de score : l'OF ne mentionne aucun segment qui distinguerait
+        // les deux — celui qui a le MOINS de segments distinctifs à couvrir a une
+        // couverture complète (ex: S3_JTO, un seul segment "S3", trouvé) tandis que
+        // l'autre a un segment manquant (ex: S3_JTO_BLANC, "BLANC" absent de l'OF) :
+        // on préfère la couverture complète plutôt que de rejeter les deux.
+        return _pdpSegmentCount(c) < myTotal;
+      });
       return !beaten;
     }
 
