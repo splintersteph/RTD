@@ -4,9 +4,12 @@
 // ═══════════════════════════════════════════════════════════
 
 let cdeSelectedClient = null;
-let cdeGlobalMode = 'clients'; // 'clients' | 'chrono'
+let cdeGlobalMode = 'clients'; // 'clients' | 'chrono' | 'devis'
 let cdeChronoSearch = '';
 let _cdeChronoSearchTimer = null;
+let cdeDevisLines = [];      // {id, ref: correspondance|null, refText, qty}
+let _cdeDevisNextId = 1;
+let cdeDevisClient = '';     // code client (zones dédiées), optionnel
 
 // Palette pour diversifier visuellement les clients finaux RTD (Chaoran, Dental
 // Cube, etc.) — contrairement aux clients OEM (3M, APOL...) qui ont chacun une
@@ -463,8 +466,248 @@ function cdeCalc() {
       + (ok ? 'Servable sans production' : 'Production nécessaire — manque '+(qty-totalFG).toLocaleString('fr')+' pièces')
       + '</div>';
   }
+
   html += '</div>';
   result.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEVIS — étude de faisabilité multi-lignes (plusieurs références en une
+// fois, sans production/lead time estimé : juste stock dispo vs quantité
+// demandée par ligne). Outil de calcul ponctuel, non sauvegardé — les lignes
+// repartent à zéro à chaque rechargement de page (décision de Stéphane,
+// 22/07/2026).
+// ═══════════════════════════════════════════════════════════
+
+function cdeDevisAddLine() {
+  cdeDevisLines.push({id: _cdeDevisNextId++, ref: null, refText: '', qty: 0});
+  renderCommandesPage();
+}
+
+function cdeDevisRemoveLine(id) {
+  cdeDevisLines = cdeDevisLines.filter(l => l.id !== id);
+  if (!cdeDevisLines.length) cdeDevisLines.push({id: _cdeDevisNextId++, ref: null, refText: '', qty: 0});
+  renderCommandesPage();
+}
+
+function cdeDevisSetClient(val) {
+  cdeDevisClient = val;
+  renderCommandesPage();
+}
+
+function cdeDevisRefChanged(id) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line) return;
+  const inp = document.getElementById('devis-ref-'+id);
+  line.refText = (inp && inp.value) || '';
+  line.ref = null; // référence exacte inconnue tant qu'une suggestion n'est pas choisie
+  cdeDevisUpdateLineResult(id);
+
+  const box = document.getElementById('devis-suggestions-'+id);
+  if (!box) return;
+  const val = line.refText.trim().toLowerCase();
+  if (!val) { box.style.display = 'none'; return; }
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+  const matches = corrs.filter(r =>
+    r.libelle_fg.toLowerCase().includes(val) ||
+    r.codart_wip.toLowerCase().includes(val) ||
+    r.code_client.toLowerCase().includes(val)
+  ).slice(0, 8);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(r =>
+    '<div onmousedown="cdeDevisPickSuggestion('+id+',\''+r.code_client.replace(/'/g,"\\'")+'\')" '
+    + 'style="padding:7px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" '
+    + 'onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'\'">'
+    + '<div style="font-weight:600">'+r.libelle_fg+'</div>'
+    + '<div style="font-size:10px;color:var(--text-faint)">'+r.client+' · '+r.codart_wip+'</div>'
+    + '</div>'
+  ).join('');
+  box.style.display = 'block';
+}
+
+function cdeDevisHideSuggestions(id) {
+  const box = document.getElementById('devis-suggestions-'+id);
+  if (box) box.style.display = 'none';
+}
+
+function cdeDevisPickSuggestion(id, codeClient) {
+  cdeDevisHideSuggestions(id);
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line) return;
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+  const ref = corrs.find(r => r.code_client === codeClient);
+  if (!ref) return;
+  line.ref = ref;
+  line.refText = ref.libelle_fg;
+  const inp = document.getElementById('devis-ref-'+id);
+  if (inp) inp.value = ref.libelle_fg;
+  cdeDevisUpdateLineResult(id);
+}
+
+function cdeDevisQtyChanged(id, val) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line) return;
+  line.qty = parseInt(val) || 0;
+  cdeDevisUpdateLineResult(id);
+}
+
+// Calcule stock dispo / manque pour une ligne (sans estimation de délai —
+// juste le manque en quantité, décision de Stéphane).
+function cdeDevisComputeLine(line) {
+  if (!line.ref) return null;
+  const zones = (cdeDevisClient && typeof pdpGetZonesForClient === 'function') ? pdpGetZonesForClient(cdeDevisClient) : null;
+  const totalFG = (typeof pdpGetTotalFGForRef === 'function') ? pdpGetTotalFGForRef(line.ref.codart_wip, line.ref.code_client) : 0;
+  const totalFGZoned = zones && typeof pdpGetTotalFGForRefZoned === 'function'
+    ? pdpGetTotalFGForRefZoned(line.ref.codart_wip, line.ref.code_client, zones)
+    : totalFG;
+  const stock = zones ? totalFGZoned : totalFG;
+  const ok = line.qty > 0 ? stock >= line.qty : null; // null = pas encore de quantité saisie
+  return { stock, ok, manque: ok === false ? line.qty - stock : 0 };
+}
+
+function cdeDevisResultCellHtml(line) {
+  const res = cdeDevisComputeLine(line);
+  if (!line.ref) return '<span style="font-size:11px;color:var(--text-faint)">Choisir une référence…</span>';
+  if (res.ok === null) return '<span style="font-size:12px;color:var(--text-muted)">Stock dispo : <strong>'+res.stock.toLocaleString('fr')+'</strong></span>';
+  return '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(res.ok?'#EAF3DE':'#FCEBEB')+';color:'+(res.ok?'#27500A':'#A32D2D')+'">'
+    + '<i class="ti '+(res.ok?'ti-check':'ti-x')+'" style="vertical-align:-2px;margin-right:4px"></i>'
+    + (res.ok ? 'OK ('+res.stock.toLocaleString('fr')+' dispo)' : 'Manque '+res.manque.toLocaleString('fr'))
+    + '</span>';
+}
+
+function cdeDevisUpdateLineResult(id) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  const cell = document.getElementById('devis-result-'+id);
+  if (line && cell) cell.innerHTML = cdeDevisResultCellHtml(line);
+  cdeDevisUpdateSummary();
+}
+
+function cdeDevisSummaryHtml() {
+  const withRef = cdeDevisLines.filter(l => l.ref && l.qty > 0);
+  if (!withRef.length) return '<span style="font-size:12px;color:var(--text-faint)">Ajoute des lignes pour étudier la faisabilité de la demande</span>';
+  const nbOk = withRef.filter(l => cdeDevisComputeLine(l).ok).length;
+  const nbKo = withRef.length - nbOk;
+  return '<span style="font-size:13px;font-weight:600">'
+    + '<span style="color:#27500A">'+nbOk+' réalisable'+(nbOk>1?'s':'')+' sans production</span>'
+    + (nbKo ? ' · <span style="color:#A32D2D">'+nbKo+' en manque</span>' : '')
+    + (nbOk===withRef.length && withRef.length>0 ? ' <i class="ti ti-circle-check" style="color:#27500A;vertical-align:-2px;margin-left:4px"></i> Devis entièrement servable' : '')
+    + '</span>';
+}
+
+function cdeDevisUpdateSummary() {
+  const bar = document.getElementById('devis-summary');
+  if (bar) bar.innerHTML = cdeDevisSummaryHtml();
+}
+
+// Import Excel pour le devis : remplace les lignes actuelles par le contenu du
+// fichier (colonne A = référence, colonne B = quantité — 1ère ligne traitée
+// comme un en-tête et ignorée). Chaque référence est recherchée automatiquement
+// dans les correspondances (même logique floue que l'autocomplétion : libellé,
+// codart_wip ou code_client) ; si aucune correspondance fiable n'est trouvée,
+// la ligne est quand même créée avec le texte brut pour que Stéphane la
+// complète à la main plutôt que de la perdre silencieusement.
+function cdeDevisImportFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const doImport = () => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, range:1, defval:null});
+        const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+
+        const newLines = [];
+        let nbMatches = 0, nbSansMatch = 0;
+
+        rows.forEach(r => {
+          const refText = String(r[0]||'').trim();
+          if (!refText) return;
+          const qty = parseInt(r[1]) || 0;
+          const val = refText.toLowerCase();
+
+          // Correspondance exacte d'abord (code_client ou codart_wip), sinon
+          // recherche floue sur le libellé — comme l'autocomplétion manuelle.
+          let ref = corrs.find(c => c.code_client.toLowerCase()===val || c.codart_wip.toLowerCase()===val)
+            || corrs.find(c => c.libelle_fg.toLowerCase().includes(val) || val.includes(c.libelle_fg.toLowerCase()));
+
+          if (ref) nbMatches++; else nbSansMatch++;
+          newLines.push({ id: _cdeDevisNextId++, ref: ref||null, refText: ref?ref.libelle_fg:refText, qty });
+        });
+
+        if (!newLines.length) { if (typeof showToast==='function') showToast('Aucune ligne exploitable trouvée (colonne A = référence, colonne B = quantité).'); return; }
+
+        cdeDevisLines = newLines;
+        if (typeof showToast === 'function') showToast(`Devis importé : ${newLines.length} ligne(s), ${nbMatches} référence(s) reconnue(s)${nbSansMatch?', '+nbSansMatch+' à choisir manuellement':''}.`);
+        renderCommandesPage();
+      } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast('Erreur import devis : ' + err.message);
+      }
+    };
+    if (typeof loadXLSXForPdp === 'function') loadXLSXForPdp(doImport);
+    else if (typeof XLSX !== 'undefined') doImport();
+    else console.error('XLSX non disponible et loadXLSXForPdp introuvable');
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = ''; // permet de réimporter le même fichier deux fois de suite si besoin
+}
+
+function cdeDevisRenderSection() {
+  if (!cdeDevisLines.length) cdeDevisLines.push({id: _cdeDevisNextId++, ref: null, refText: '', qty: 0});
+
+  const zonesConfig = (typeof CLIENT_STOCK_ZONES !== 'undefined') ? CLIENT_STOCK_ZONES : {};
+  const clientLabels = { 'CCH1228': 'Chaoran (CCH1228)', 'ICE1103': 'DS DNA (ICE1103)' };
+  const clientOptions = '<option value="">Client standard (stock général)</option>'
+    + Object.keys(zonesConfig).map(code =>
+        '<option value="'+code+'" '+(cdeDevisClient===code?'selected':'')+'>'+(clientLabels[code]||code)+'</option>'
+      ).join('');
+
+  const rowsHtml = cdeDevisLines.map(line =>
+    '<tr>'
+    + '<td style="position:relative;min-width:240px">'
+    + '<input id="devis-ref-'+line.id+'" value="'+(line.refText||'').replace(/"/g,'&quot;')+'" placeholder="ex: W41, DT Illusion…" '
+    + 'oninput="cdeDevisRefChanged('+line.id+')" onfocus="cdeDevisRefChanged('+line.id+')" onblur="setTimeout(()=>cdeDevisHideSuggestions('+line.id+'),150)" autocomplete="off" '
+    + 'style="width:100%;padding:7px 9px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + '<div id="devis-suggestions-'+line.id+'" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:3px"></div>'
+    + '</td>'
+    + '<td style="width:130px">'
+    + '<input type="number" min="1" placeholder="Quantité" value="'+(line.qty||'')+'" oninput="cdeDevisQtyChanged('+line.id+',this.value)" '
+    + 'style="width:100%;padding:7px 9px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + '</td>'
+    + '<td id="devis-result-'+line.id+'" style="min-width:170px">'+cdeDevisResultCellHtml(line)+'</td>'
+    + '<td style="width:36px;text-align:center">'
+    + '<button onclick="cdeDevisRemoveLine('+line.id+')" title="Retirer cette ligne" style="background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:15px;padding:4px"><i class="ti ti-trash"></i></button>'
+    + '</td>'
+    + '</tr>'
+  ).join('');
+
+  return '<div style="flex:1;overflow-y:auto;padding:16px 20px">'
+    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px">'
+    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em"><i class="ti ti-file-text" style="vertical-align:-2px;margin-right:6px"></i>Devis — étude de faisabilité</div>'
+    + '<div style="margin-left:auto;min-width:220px">'
+    + '<select onchange="cdeDevisSetClient(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none">'
+    + clientOptions
+    + '</select>'
+    + '</div>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse">'
+    + '<thead><tr style="text-align:left">'
+    + '<th style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;padding-bottom:6px">Référence</th>'
+    + '<th style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;padding-bottom:6px">Quantité</th>'
+    + '<th style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;padding-bottom:6px">Faisabilité</th>'
+    + '<th></th>'
+    + '</tr></thead>'
+    + '<tbody>'+rowsHtml+'</tbody>'
+    + '</table>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+    + '<button onclick="cdeDevisAddLine()" class="btn" style="font-size:12px;padding:6px 12px"><i class="ti ti-plus"></i> Ajouter une ligne</button>'
+    + '<label class="btn" style="cursor:pointer;font-size:12px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-file-import"></i> Importer un fichier (référence, quantité)<input type="file" accept=".xls,.xlsx" style="display:none" onchange="cdeDevisImportFile(this)"></label>'
+    + '</div>'
+    + '<div id="devis-summary" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">'+cdeDevisSummaryHtml()+'</div>'
+    + '</div></div>';
 }
 
 
@@ -531,7 +774,20 @@ function renderCommandesPage() {
   const modeToggle = '<div style="display:flex;gap:6px;margin-left:12px">'
     + '<button onclick="cdeSetGlobalMode(\'clients\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='clients'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='clients'?'#fff':'var(--text)')+'">Par client</button>'
     + '<button onclick="cdeSetGlobalMode(\'chrono\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='chrono'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='chrono'?'#fff':'var(--text)')+'">Par date</button>'
+    + '<button onclick="cdeSetGlobalMode(\'devis\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='devis'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='devis'?'#fff':'var(--text)')+'"><i class="ti ti-file-text" style="vertical-align:-2px;margin-right:3px"></i>Devis</button>'
     + '</div>';
+
+  if (cdeGlobalMode === 'devis') {
+    const html = '<div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">'
+      + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+      + '<h2 style="font-size:17px;font-weight:600">Commandes</h2>'
+      + modeToggle
+      + '</div>'
+      + cdeDevisRenderSection()
+      + '</div>';
+    el.innerHTML = html;
+    return;
+  }
 
   if (cdeGlobalMode === 'chrono') {
     let lines = cdeGetAllOpenLines();
