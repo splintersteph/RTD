@@ -30,6 +30,7 @@ const RTD_FAM_COLORS = {
 
 let pdpSelectedClient = null;
 let pdpSearchFilter = '';
+let pdpNavCollapsed = false; // replie le bandeau clients/familles (utile sur petit écran)
 let _pdpSearchTimer = null;
 let pdpCustomNames = {};
 let pdpCustomOrder = {};
@@ -588,6 +589,9 @@ function renderPdpPage() {
     +'<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface)">'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
     +'<h2 style="font-size:17px;font-weight:600"><i class="ti ti-chart-bar" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Plan Directeur de Production</h2>'
+    +'<button onclick="pdpToggleNav()" title="'+(pdpNavCollapsed?'Afficher':'Replier')+' la liste clients/familles" style="background:none;border:1px solid var(--border-med);border-radius:var(--radius);cursor:pointer;color:var(--text-muted);padding:4px 8px;display:flex;align-items:center">'
+    +'<i class="ti ti-chevron-'+(pdpNavCollapsed?'down':'up')+'" style="font-size:14px"></i>'
+    +'</button>'
     +(pdpSelectedClient
       ? '<button class="btn" data-pdp-key="" style="font-size:11px;padding:4px 10px"><i class="ti ti-arrow-left"></i> Tous les clients</button>'
       : '')
@@ -599,8 +603,9 @@ function renderPdpPage() {
       : '<span style="font-size:10px;color:var(--text-faint)">'+pdpGetActiveCorrespondances().length+' réf. par défaut</span>')
     +'</div>'
 
+    +(pdpNavCollapsed ? '' :
     // Tabs clients
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
     +(pdpSelectedClient
       ? '<button class="btn" onclick="pdpSortAZ()" style="font-size:11px;padding:5px 10px" title="Trier A \u2192 Z"><i class="ti ti-sort-a-z"></i></button>'
         +'<button class="btn" onclick="pdpResetOrder()" style="font-size:11px;padding:5px 10px" title="Ordre par d\u00e9faut"><i class="ti ti-refresh"></i></button>'
@@ -610,7 +615,7 @@ function renderPdpPage() {
     +'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
     +clientTabs
-    +'</div>'
+    +'</div>')
     +'</div>'
 
     // Contenu
@@ -620,6 +625,11 @@ function renderPdpPage() {
     +'</div>';
 }
 
+
+function pdpToggleNav() {
+  pdpNavCollapsed = !pdpNavCollapsed;
+  renderPdpPage();
+}
 
 function pdpSelectClient(client) {
   pdpSelectedClient = client;
