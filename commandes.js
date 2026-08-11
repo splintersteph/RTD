@@ -1083,9 +1083,16 @@ function renderCommandesPage() {
       + '</div>';
 
     if (orders.length) {
+      // Colonne Référence : n'a de sens que pour 3M, dont les commandes n'ont
+      // jamais qu'une seule ligne (demandé par Stéphane, 26/07/2026) — pour les
+      // autres clients une commande peut avoir plusieurs lignes, donc "la"
+      // référence n'aurait pas de sens dans une seule cellule.
+      const showRefCol = cdeSelectedClient === '3M';
       mainContent += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">'
         + '<div style="overflow-x:auto"><table class="cat-table" style="min-width:700px">'
-        + '<thead><tr><th>N° Cde</th><th>Client final</th><th style="text-align:right">Lignes</th>'
+        + '<thead><tr><th>N° Cde</th><th>Client final</th>'
+        + (showRefCol ? '<th>Référence</th>' : '')
+        + '<th style="text-align:right">Lignes</th>'
         + '<th style="text-align:right">Restant</th><th>Livraison</th><th></th></tr></thead><tbody>';
       orders.forEach(o => {
         const dates = [...o.dates].sort();
@@ -1095,6 +1102,7 @@ function renderCommandesPage() {
         mainContent += '<tr data-cde-action="show-order" data-cde-arg="'+o.numCmd.replace(/"/g,'&quot;')+'" style="cursor:pointer" onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'\'">'
           + '<td style="font-size:11px;font-weight:600;font-family:monospace;color:var(--accent)">'+o.numCmd+'</td>'
           + '<td style="font-size:12px">'+o.client+'</td>'
+          + (showRefCol ? '<td style="font-size:12px;color:var(--text-muted)">'+(o.lines[0]?o.lines[0].libelle:'—')+'</td>' : '')
           + '<td style="text-align:right;font-size:12px">'+o.lines.length+'</td>'
           + '<td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">'+o.totalRestant.toLocaleString('fr')+'</span></td>'
           + '<td style="font-size:11px;color:var(--text-muted)">'+dateLabel+'</td>'
