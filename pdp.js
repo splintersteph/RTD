@@ -914,7 +914,7 @@ function _pdpLenVariant(str) {
 // inversement.
 function pdpGetOFsForRef(codart_wip, shortName) {
   if (typeof ofs === 'undefined') return [];
-  const norm = s => String(s||'').toUpperCase().replace(/[_\-\s%]/g, '');
+  const norm = s => String(s||'').toUpperCase().replace(/,/g, '.').replace(/[_\-\s%]/g, '');
   const target = norm(codart_wip);
   const targetShort = shortName ? norm(shortName) : null;
   const refLenVariant = _pdpLenVariant(codart_wip);
@@ -976,6 +976,12 @@ function pdpGetOFsForRef(codart_wip, shortName) {
     if (targetShort) {
       const segs = String(o.produit||'').toUpperCase().split(/[_\-\s]+/).map(norm);
       if (segs.includes(targetShort)) return true;
+      // 3. Repli supplémentaire : nom court à PLUSIEURS mots (ex: "PF 1.2") — la
+      // comparaison segment par segment ci-dessus ne peut pas fonctionner ici,
+      // puisque le nom court normalisé fusionne ses propres espaces ("PF1.2")
+      // alors que les segments de l'OF restent séparés ("PF", "1.2"). On compare
+      // donc aussi la chaîne ENTIÈRE normalisée du produit de l'OF.
+      if (prod === targetShort) return true;
     }
     return false;
   });
