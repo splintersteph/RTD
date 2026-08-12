@@ -4157,6 +4157,14 @@ function openCalculateur() {
   setTimeout(()=>document.getElementById('calc-ref')?.focus(), 50);
 }
 
+// Arrondit une longueur de jonc au multiple de 3 mètres supérieur — les joncs
+// bruts de pultrusion sont fournis/débités par barres de 3m, donc toute
+// longueur calculée doit toujours être arrondie à ce multiple (demandé par
+// Stéphane, 12/08/2026).
+function pultRoundToMultiple3(m) {
+  return Math.ceil(m / 3) * 3;
+}
+
 let calcAcIdx = -1;
 
 function calcRefInput() {
@@ -4238,7 +4246,7 @@ function calcFromQty() {
   const tenons = entry?.tenons_ml;
   _calcUpdating = true;
   const inp = document.getElementById('calc-metres');
-  if (inp) inp.value = (tenons && qty > 0) ? Math.ceil(qty / tenons * 10) / 10 : '';
+  if (inp) inp.value = (tenons && qty > 0) ? pultRoundToMultiple3(qty / tenons) : '';
   _calcUpdating = false;
   calcUpdate();
 }
@@ -4277,7 +4285,7 @@ function calcUpdate() {
   const matiere   = entry.matiere;
   const machine   = entry.machine;
   const qtyFinal  = qty > 0 ? qty : (tenons && metresVal > 0 ? Math.floor(metresVal * tenons) : 0);
-  const metresFinal = tenons && qtyFinal > 0 ? Math.ceil(qtyFinal / tenons * 10) / 10 : null;
+  const metresFinal = tenons && qtyFinal > 0 ? pultRoundToMultiple3(qtyFinal / tenons) : null;
   const heures    = qtyFinal > 0 && tc ? (qtyFinal * tc) / 3600 : null;
   const heuresTrs = qtyFinal > 0 && tcTrs ? (qtyFinal * tcTrs) / 3600 : null;
 
