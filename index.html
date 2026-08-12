@@ -4285,12 +4285,13 @@ function calcUpdate() {
   const matiere   = entry.matiere;
   const machine   = entry.machine;
   const qtyFinal  = qty > 0 ? qty : (tenons && metresVal > 0 ? Math.floor(metresVal * tenons) : 0);
+  const metresRaw   = tenons && qtyFinal > 0 ? qtyFinal / tenons : null;
   const metresFinal = tenons && qtyFinal > 0 ? pultRoundToMultiple3(qtyFinal / tenons) : null;
   const heures    = qtyFinal > 0 && tc ? (qtyFinal * tc) / 3600 : null;
   const heuresTrs = qtyFinal > 0 && tcTrs ? (qtyFinal * tcTrs) / 3600 : null;
 
-  const row = (icon, label, value, color=null) =>
-    `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:${color?'var(--accent-light)':'var(--bg)'}">
+  const row = (icon, label, value, color=null, title=null) =>
+    `<div ${title?`title="${title}"`:''} style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:${color?'var(--accent-light)':'var(--bg)'}${title?';cursor:help':''}">
       <i class="ti ${icon}" style="color:${color||'var(--text-faint)'};font-size:15px;flex-shrink:0"></i>
       <span style="font-size:12px;color:var(--text-muted);flex:1">${label}</span>
       <span style="font-size:${color?'15':'13'}px;font-weight:${color?700:500};color:${color||'var(--text)'}">${value}</span>
@@ -4303,7 +4304,8 @@ function calcUpdate() {
     machine ? row('ti-tool', 'Machine', machine) : '',
     tc ? row('ti-clock', 'Temps cycle', tc + 's/u' + (tcTrs ? ` (TRS: ${tcTrs}s)` : '')) : '',
     tenons ? row('ti-stack-2', 'Tenons par ML', tenons.toFixed(1) + ' /ML') : row('ti-alert-circle', 'Tenons par ML', 'Non disponible — catalogue à mettre à jour'),
-    metresFinal !== null ? row('ti-ruler-2', 'Mètres de joncs', metresFinal.toLocaleString('fr') + ' m', '#1D9E75') : '',
+    metresFinal !== null ? row('ti-ruler-2', 'Mètres de joncs', metresFinal.toLocaleString('fr') + ' m', '#1D9E75',
+      'Valeur réelle calculée : ' + metresRaw.toLocaleString('fr', {maximumFractionDigits:2}) + ' m — arrondie au multiple de 3 supérieur') : '',
     qtyFinal > 0 && tenons ? row('ti-stack-2', 'Quantité de pièces', qtyFinal.toLocaleString('fr') + ' pièces', '#4C8EDA') : '',
     heures !== null ? row('ti-hourglass', "Durée d'usinage estimée", (()=>{
       const j = Math.ceil(heures / HEURES_PAR_JOUR);
