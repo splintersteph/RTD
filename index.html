@@ -311,6 +311,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
     <input type="text" id="search" placeholder="Rechercher un OF, produit…" oninput="render()">
   </div>
   <div class="topbar-right">
+    <div class="topbar-imports" style="position:relative">
+      <button class="btn" onclick="toggleImportsMenu(event)" style="font-size:12px;padding:6px 12px" title="Imports ERP (Stock, Commandes, OF en cours)">
+        <i class="ti ti-cloud-upload"></i> Imports
+      </button>
+      <div id="imports-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;width:280px;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:100;padding:10px"></div>
+    </div>
     <div class="save-status" id="save-status"><i class="ti ti-cloud-check"></i><span id="save-label">Connecté</span></div>
     <span class="topbar-date" id="topbar-date"></span>
   </div>
@@ -3431,9 +3437,50 @@ function readExcelFile(file, cb) {
   reader.readAsArrayBuffer(file);
 }
 
+// Menu global d'imports (bannière du haut, visible sur toutes les pages) —
+// centralise Stock/Commandes/OF en cours au même endroit que la page Stock,
+// pour ne plus avoir à y retourner depuis Besoins/PDP/Planning Composite juste
+// pour réimporter (demandé par Stéphane, 12/08/2026).
+function toggleImportsMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('imports-menu');
+  if (!menu) return;
+  const willOpen = menu.style.display === 'none';
+  if (willOpen) { renderImportsMenu(); menu.style.display = 'block'; }
+  else menu.style.display = 'none';
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('imports-menu');
+  if (menu && menu.style.display === 'block' && !menu.contains(e.target) && e.target.id !== 'imports-menu') {
+    menu.style.display = 'none';
+  }
+});
+function renderImportsMenu() {
+  const menu = document.getElementById('imports-menu');
+  if (!menu) return;
+  const li = pcData.lastImport || {};
+  const item = (label, key, count, type) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 6px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600">${label}</div>
+        <div style="font-size:10px;color:var(--text-faint)">${li[key] ? count.toLocaleString('fr')+' lignes · '+li[key] : 'Non importé'}</div>
+      </div>
+      <label class="btn" style="font-size:11px;padding:4px 10px;cursor:pointer;flex-shrink:0">
+        <i class="ti ti-upload"></i> Import
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="pcImport('${type}',this)">
+      </label>
+    </div>`;
+  menu.innerHTML = `
+    <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;padding:2px 6px 8px">Imports ERP</div>
+    ${item('Stock (PTSTOCKSIMPLE)', 'stock', (pcData.stock||[]).length, 'stock')}
+    ${item('Commandes', 'commandes', (pcData.commandes||[]).length, 'commandes')}
+    ${item('OF en cours', 'of', (pcData.ofEnCours||[]).length, 'of')}
+  `;
+}
+
 function pcImport(type, input) {
   const file = input.files[0]; if (!file) return;
-  const today = new Date().toLocaleDateString('fr-FR');
+  const today = new Date().toLocaleDateString('fr-FR') + ' ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
   showToast('Chargement ' + file.name + '…');
   readExcelFile(file, rows => {
     if (type === 'of')        { pcData.ofEnCours = rows;  pcData.lastImport.of = today; }
@@ -3443,6 +3490,7 @@ function pcImport(type, input) {
     scheduleSave(); // pousse pcData sur le serveur pour qu'il survive au prochain rechargement
     if (currentView === 'stock') renderStockPage();
     if (currentView === 'planning') renderPlanningComposite();
+    renderImportsMenu(); // tient le menu global à jour même déclenché depuis la page Stock
     input.value = '';
   });
 }
