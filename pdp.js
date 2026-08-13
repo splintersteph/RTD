@@ -1172,6 +1172,28 @@ function pdpShowDetail(code_client) {
       + '</div></div>';
   }).join('');
 
+  // Récap mensuel des quantités restantes (regroupé par mois de livraison) —
+  // demandé par Stéphane, 12/08/2026, pour voir d'un coup d'œil la charge par
+  // mois sans avoir à additionner ligne par ligne.
+  const MOIS_FR = ['Janv.','Févr.','Mars','Avr.','Mai','Juin','Juil.','Août','Sept.','Oct.','Nov.','Déc.'];
+  const byMonth = {};
+  cmds.forEach(c => {
+    const key = c.datDel ? c.datDel.slice(0,7) : 'sans-date'; // YYYY-MM
+    byMonth[key] = (byMonth[key]||0) + c.qteRest;
+  });
+  const monthKeys = Object.keys(byMonth).sort();
+  const monthlyRecapHtml = monthKeys.length > 1
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+      + monthKeys.map(k => {
+          const label = k === 'sans-date' ? 'Sans date' : MOIS_FR[+k.slice(5,7)-1] + ' ' + k.slice(2,4);
+          return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;text-align:center">'
+            + '<div style="font-size:9px;color:var(--text-faint);text-transform:uppercase">'+label+'</div>'
+            + '<div style="font-size:14px;font-weight:700;color:#633806">'+byMonth[k].toLocaleString('fr')+'</div>'
+            + '</div>';
+        }).join('')
+      + '</div>'
+    : '';
+
   const cmdsHtml = cmds.length
     ? '<table class="cat-table" style="width:100%"><thead><tr><th>N° Cde</th><th>Client</th><th style="text-align:right">Cdé</th><th style="text-align:right">Livré</th><th style="text-align:right">Restant</th><th>Livraison</th></tr></thead><tbody>'
       + cmds.map(c => '<tr'
@@ -1280,6 +1302,7 @@ function pdpShowDetail(code_client) {
     + '<div>'
     + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">'
     + '<i class="ti ti-shopping-cart" style="vertical-align:-2px;margin-right:5px"></i>'+cmds.length+' commande(s) ouverte(s)</div>'
+    + monthlyRecapHtml
     + cmdsHtml
     + '</div>'
 
