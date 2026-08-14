@@ -175,36 +175,37 @@ function pdpGetTotalFGForRef(codart_wip, code_client) {
 function pdpGetTotalFGForRefZoned(codart_wip, code_client, zones) {
   if (!zones || !zones.blister || !zones.fg) return pdpGetTotalFGForRef(codart_wip, code_client);
 
-  const _stkFull = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip : () => 0;
   const _stkZone = (c, z) => (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(c, z) : 0;
   const _enc = (typeof pdpGetEnCoursForWip === 'function') ? pdpGetEnCoursForWip : () => 0;
 
-  const nom = pdpFindNomenclature(codart_wip, code_client);
-  if (!nom) {
+  const noms = pdpFindAllNomenclatures(codart_wip, code_client);
+  if (!noms.length) {
     // Produit simple (pas de nomenclature) : on considère qu'il s'agit déjà du
     // niveau FG, donc la zone FG s'applique.
     return _stkZone(codart_wip, zones.fg) + _enc(codart_wip);
   }
 
-  // Repérer la première étape "blister" (par son libellé ou son code) : c'est à
-  // partir de là que la restriction de zone s'applique. Si aucune étape ne semble
-  // être un blister (chaîne courte type tenon→FG direct), on applique la
-  // restriction (zone FG) à tout sauf le tout premier niveau (le tenon brut).
-  let blisterIdx = nom.etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
+  // Repérer la première étape "blister" (par son libellé ou son code), sur la
+  // 1ère chaîne (la "standard") : c'est à partir de là que la restriction de
+  // zone client s'applique. Si aucune étape ne semble être un blister (chaîne
+  // courte type tenon→FG direct), on applique la restriction (zone FG) à tout
+  // sauf le tout premier niveau (le tenon brut).
+  let blisterIdx = noms[0].etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
   if (blisterIdx < 0) blisterIdx = 1;
 
-  return nom.etapes.reduce((s, e, i) => {
+  // Sommer sur toutes les chaînes (généralement une seule ; plusieurs pour un
+  // code FG partagé entre chaîne standard et chaîne dédiée comme BCHINE — voir
+  // pdpFindAllNomenclatures). La restriction de zone PAR ÉTAPE (zoneRestrict,
+  // ex: BCHINE) prime toujours sur la restriction de zone CLIENT ci-dessous
+  // (gérée par pdpStockForEtape).
+  return noms.reduce((total, nom, chainIdx) => total + nom.etapes.reduce((s, e, i) => {
     let cumRatio = 1;
     for (let j = i; j < nom.etapes.length - 1; j++) {
       if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
     }
-    let stk;
-    if (i === blisterIdx) stk = _stkZone(e.codart, zones.blister);
-    else if (i > blisterIdx) stk = _stkZone(e.codart, zones.fg);
-    else stk = _stkFull(e.codart);
-    stk += (i === 0 ? _enc(e.codart) : 0);
+    const stk = pdpStockForEtape(e, zones, i, chainIdx === 0 ? blisterIdx : -1) + (i === 0 ? _enc(e.codart) : 0);
     return s + (cumRatio > 1 ? Math.floor(stk / cumRatio) : stk);
-  }, 0);
+  }, 0), 0);
 }
 
 function renderPdpPage() {
@@ -402,29 +403,30 @@ function renderPdpPage() {
     // pour être réutilisable telle quelle par les références "isolées" (aucune autre
     // ref ne partage leur codart_wip de départ).
     function renderTile(r) {
-      const nom = pdpFindNomenclature(r.codart_wip, r.code_client);
+      const noms = pdpFindAllNomenclatures(r.codart_wip, r.code_client);
 
       // Calculer les niveaux avec conversion en FG
       let levels = [];
-      if (nom) {
-        // Calculer le ratio cumulatif vers le FG depuis chaque étape
-        const etapes = nom.etapes;
-        levels = etapes.map((e, i) => {
-          // Ratio cumulatif : produit des ratios de l'étape i jusqu'à la fin
-          let cumRatio = 1;
-          for (let j = i; j < etapes.length - 1; j++) {
-            if (etapes[j].ratio) cumRatio *= etapes[j].ratio;
-          }
-          const stk = (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
-          const enc = (typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
-          return {
-            label: e.label, codart: e.codart,
-            stk, enc,
-            total: stk + enc,
-            fgEquiv: cumRatio > 1 ? Math.floor((stk + enc) / cumRatio) : (stk + enc),
-            isFG: e.ratio === null,
-            cumRatio,
-          };
+      if (noms.length) {
+        noms.forEach((nom, chainIdx) => {
+          const etapes = nom.etapes;
+          etapes.forEach((e, i) => {
+            // Ratio cumulatif : produit des ratios de l'étape i jusqu'à la fin DE CETTE CHAÎNE
+            let cumRatio = 1;
+            for (let j = i; j < etapes.length - 1; j++) {
+              if (etapes[j].ratio) cumRatio *= etapes[j].ratio;
+            }
+            const stk = pdpStockForEtape(e, null, i, -1);
+            const enc = (i === 0 && typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
+            levels.push({
+              label: e.label, codart: e.codart,
+              stk, enc,
+              total: stk + enc,
+              fgEquiv: cumRatio > 1 ? Math.floor((stk + enc) / cumRatio) : (stk + enc),
+              isFG: e.ratio === null,
+              cumRatio,
+            });
+          });
         });
       } else {
         totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
