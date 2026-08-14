@@ -92,6 +92,29 @@ function pdpFindNomenclature(codart_wip, code_client) {
   return (typeof findNomenclatureByCodart === 'function') ? findNomenclatureByCodart(codart_wip) : null;
 }
 
+// Retrouve TOUTES les chaînes de nomenclature partageant ce code_client — la
+// plupart des références n'en ont qu'une (comportement identique à
+// pdpFindNomenclature), mais certaines (ex: 5010001, standard + Chine/BCHINE)
+// en ont plusieurs, stockées séparément dans `nomenclatures` avec le même champ
+// code_client explicite (voir pdpImportCorrespondances). Ajouté 14/08/2026.
+function pdpFindAllNomenclatures(codart_wip, code_client) {
+  if (typeof nomenclatures === 'undefined') return [];
+  const byField = code_client ? nomenclatures.filter(n => n.code_client === code_client) : [];
+  if (byField.length) return byField;
+  const single = pdpFindNomenclature(codart_wip, code_client);
+  return single ? [single] : [];
+}
+
+// Stock d'une étape, en respectant sa restriction de zone éventuelle (ex:
+// "BCHINE") — sinon le calcul général habituel (nomGetStock, ou zones client
+// dédié si fourni).
+function pdpStockForEtape(e, zones, i, blisterIdx) {
+  if (e.zoneRestrict) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, [e.zoneRestrict]) : 0;
+  if (zones && i === blisterIdx) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.blister) : 0;
+  if (zones && i > blisterIdx) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.fg) : 0;
+  return (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
+}
+
 // ── pdpGetTotalFGForRef ───────────────────────────────────────────────────────
 // Calcule le stock total FG équivalent pour une référence (tous niveaux de nomenclature).
 // Doit être définie AVANT renderPdpPage() qui l'utilise.
@@ -99,9 +122,9 @@ function pdpGetTotalFGForRef(codart_wip, code_client) {
   const _stk = typeof pdpGetStockForWip === 'function' ? pdpGetStockForWip : () => 0;
   const _enc = typeof pdpGetEnCoursForWip === 'function' ? pdpGetEnCoursForWip : () => 0;
 
-  const nom = pdpFindNomenclature(codart_wip, code_client);
+  const noms = pdpFindAllNomenclatures(codart_wip, code_client);
 
-  if (!nom) {
+  if (!noms.length) {
     // Pas de nomenclature : stock du WIP brut uniquement. code_client est un numéro
     // de référence commercial (utilisé côté commandes), PAS un code de stock ou de
     // production — l'additionner en plus provoquait un double comptage dès que
@@ -118,7 +141,9 @@ function pdpGetTotalFGForRef(codart_wip, code_client) {
   // consolidation). Ne PAS ne garder que le stock du dernier niveau : ça ignorerait
   // tout le stock amont (tenons, blisters vrac) qui n'a pas encore été transformé.
 
-  // Produit multi-niveaux → sommer les équivalents FG de chaque niveau.
+  // Produit multi-niveaux → sommer les équivalents FG de chaque niveau, de CHAQUE
+  // chaîne (généralement une seule ; plusieurs pour un code FG partagé entre une
+  // chaîne standard et une chaîne dédiée comme BCHINE — voir pdpFindAllNomenclatures).
   // IMPORTANT : le ratio cumulé jusqu'au FG, pas seulement celui de l'étape immédiate
   // suivante — un tenon doit passer par TOUTES les conversions restantes (ex: 5 tenons
   // → 1 blister, PUIS 2 blisters → 1 boîte FG = 10 tenons pour 1 FG, pas 5). Diviser
@@ -126,18 +151,18 @@ function pdpGetTotalFGForRef(codart_wip, code_client) {
   // total (ex: 2053 affiché au lieu de 2012, le vrai total de la tuile PDP). Doit
   // rester identique au calcul de pdpShowDetail ci-dessous.
   // AUTRE PIÈGE : l'en-cours de production (_enc) ne doit être compté QU'AU PREMIER
-  // NIVEAU (le tenon brut). Un même lot de matière suivi comme "en cours" pendant sa
-  // transformation successive (tenon → jointé → blister) ne représente qu'UNE seule
-  // quantité physique — le compter à chaque étape où l'ERP le mentionne double (ou
-  // triple) artificiellement l'en-cours réel.
-  return nom.etapes.reduce((s, e, i) => {
+  // NIVEAU (le tenon brut) DE CHAQUE CHAÎNE. Un même lot de matière suivi comme "en
+  // cours" pendant sa transformation successive (tenon → jointé → blister) ne
+  // représente qu'UNE seule quantité physique — le compter à chaque étape où l'ERP
+  // le mentionne double (ou triple) artificiellement l'en-cours réel.
+  return noms.reduce((total, nom) => total + nom.etapes.reduce((s, e, i) => {
     let cumRatio = 1;
     for (let j = i; j < nom.etapes.length - 1; j++) {
       if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
     }
-    const stk = _stk(e.codart) + (i === 0 ? _enc(e.codart) : 0);
+    const stk = pdpStockForEtape(e, null, i, -1) + (i === 0 ? _enc(e.codart) : 0);
     return s + (cumRatio > 1 ? Math.floor(stk / cumRatio) : stk);
-  }, 0);
+  }, 0), 0);
 }
 
 // Identique à pdpGetTotalFGForRef, mais restreint le stock compté à des zones
@@ -1079,30 +1104,41 @@ function pdpGotoStock(codart_wip) {
 // pdpGetTotalFGForRefZoned, pour que le détail affiché corresponde exactement au
 // total déjà montré.
 function pdpGetLevelsBreakdown(codart_wip, code_client, zones) {
-  const nom = pdpFindNomenclature(codart_wip, code_client);
+  const noms = pdpFindAllNomenclatures(codart_wip, code_client);
 
   // blisterIdx calculé systématiquement (pas seulement si zones) : sert aussi au
   // regroupement en 3 catégories (tenons / blisters / FG) côté affichage.
+  // Calculé sur la 1ère chaîne (la "standard") — les chaînes additionnelles
+  // (ex: BCHINE) ont leur propre restriction de zone par étape (zoneRestrict),
+  // qui prime de toute façon sur blisterIdx (voir pdpStockForEtape).
   let blisterIdx = -1;
-  if (nom) {
-    blisterIdx = nom.etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
-    if (blisterIdx < 0) blisterIdx = nom.etapes.length > 1 ? 1 : 0;
+  if (noms.length) {
+    const refNom = noms[0];
+    blisterIdx = refNom.etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
+    if (blisterIdx < 0) blisterIdx = refNom.etapes.length > 1 ? 1 : 0;
   }
 
   let levels;
-  if (nom) {
-    levels = nom.etapes.map((e, i) => {
-      let cumRatio = 1;
-      for (let j = i; j < nom.etapes.length - 1; j++) {
-        if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
-      }
-      let stk;
-      if (zones && i === blisterIdx) stk = (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.blister) : 0;
-      else if (zones && i > blisterIdx) stk = (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.fg) : 0;
-      else stk = (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
-      const enc = (i === 0 && typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
-      const total = stk + enc;
-      return { label: e.label, codart: e.codart, stk, enc, total, fgEquiv: cumRatio > 1 ? Math.floor(total/cumRatio) : total, isFG: e.ratio === null, isBlister: i === blisterIdx };
+  if (noms.length) {
+    levels = [];
+    noms.forEach((nom, chainIdx) => {
+      const chainZone = nom.etapes.find(e => e.zoneRestrict);
+      nom.etapes.forEach((e, i) => {
+        let cumRatio = 1;
+        for (let j = i; j < nom.etapes.length - 1; j++) {
+          if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
+        }
+        const stk = pdpStockForEtape(e, zones, i, chainIdx === 0 ? blisterIdx : -1);
+        const enc = (i === 0 && typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
+        const total = stk + enc;
+        levels.push({
+          label: e.label, codart: e.codart, stk, enc, total,
+          fgEquiv: cumRatio > 1 ? Math.floor(total/cumRatio) : total,
+          isFG: e.ratio === null, isBlister: chainIdx === 0 && i === blisterIdx,
+          chainStart: i === 0 && chainIdx > 0, // 1ère étape d'une chaîne additionnelle -> intertitre
+          chainName: (i === 0 && chainIdx > 0) ? (chainZone ? 'Chaîne ' + chainZone.zoneRestrict : nom.nom) : null,
+        });
+      });
     });
   } else {
     const stk = (zones && typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(codart_wip, zones.fg) : pdpGetStockForWip(codart_wip);
@@ -1110,7 +1146,7 @@ function pdpGetLevelsBreakdown(codart_wip, code_client, zones) {
     levels = [{ label: codart_wip, codart: codart_wip, stk, enc, total: stk+enc, fgEquiv: stk+enc, isFG: true, isBlister: false }];
   }
   const totalFG = levels.reduce((s,l) => s + l.fgEquiv, 0);
-  return { nom, levels, totalFG, blisterIdx };
+  return { nom: noms[0]||null, levels, totalFG, blisterIdx };
 }
 
 function pdpShowDetail(code_client) {
@@ -1161,11 +1197,18 @@ function pdpShowDetail(code_client) {
   const COLORS = ['#4C8EDA','#1D9E75','#D4880A','#7C3AED'];
   const barMax = Math.max(...levels.map(l => l.fgEquiv), totalCde, 1);
 
+  let _levelNum = 0;
   const levelsHtml = levels.map((lv,i) => {
-    const color = lv.isFG ? '#7C3AED' : COLORS[Math.min(i,COLORS.length-1)];
+    if (lv.chainStart) _levelNum = 0;
+    _levelNum++;
+    const color = lv.isFG ? '#7C3AED' : COLORS[Math.min(_levelNum-1,COLORS.length-1)];
     const pct = Math.round(lv.fgEquiv/barMax*100);
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
-      + '<span style="width:24px;height:24px;border-radius:50%;background:'+color+';color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</span>'
+    return (lv.chainStart
+        ? '<div style="margin:14px 0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);display:flex;align-items:center;gap:6px">'
+          + '<i class="ti ti-git-branch" style="font-size:11px"></i>' + lv.chainName + '</div>'
+        : '')
+      + '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
+      + '<span style="width:24px;height:24px;border-radius:50%;background:'+color+';color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+_levelNum+'</span>'
       + '<div style="flex:1;min-width:0">'
       + '<div style="font-size:13px;font-weight:600;color:var(--text)">'+lv.label+'</div>'
       + '<div style="font-size:10px;color:var(--text-faint);font-family:monospace">'+lv.codart+'</div>'
@@ -1391,49 +1434,90 @@ function pdpImportCorrespondances(input) {
           ratio:       (r['Ratio → étape suivante']!==''&&r['Ratio → étape suivante']!==undefined)
                         ? Number(r['Ratio → étape suivante'])
                         : ((r['Ratio']!==''&&r['Ratio']!==undefined) ? Number(r['Ratio']) : null),
-        })).filter(r => r.client && r.codart_wip)
-           .sort((a,b) => a.ordre - b.ordre);
+          // Matière : sert de marqueur de zone de stock dédiée pour cette étape (ex:
+          // "BCHINE" -> ne compter que le stock physiquement dans cette zone). Ajouté
+          // le 14/08/2026 pour distinguer les chaînes d'approvisionnement Chine des
+          // chaînes standard qui partagent le même code FG (ex: 5010001).
+          matiere:     String(r['Matière']||r['Matiere']||'').trim(),
+        })).filter(r => r.client && r.codart_wip);
+        // NE PAS trier globalement par ordre ici : ça entrelacerait les étapes de
+        // deux chaînes distinctes partageant le même code_client (ex: 5010001 a une
+        // chaîne "standard" ET une chaîne "Chine", chacune avec ses propres Ordre
+        // 1/2/3) — voir la scission par groupe ci-dessous, qui a besoin de l'ordre
+        // ORIGINAL du fichier pour détecter où une nouvelle chaîne recommence.
 
         if (!lines.length) {
           if (typeof showToast === 'function') showToast('✗ Aucune ligne valide trouvée dans le fichier');
           return;
         }
 
-        // Grouper par code_client (FG) pour reconstruire correspondances + nomenclatures
+        // Grouper par code_client (FG), en PRÉSERVANT l'ordre du fichier (pas de tri
+        // global par ordre — voir commentaire ci-dessus).
         const groups = {};
         lines.forEach(l => {
           groups[l.code_client] = groups[l.code_client] || [];
           groups[l.code_client].push(l);
         });
 
+        // Scinde un groupe en chaînes distinctes : une nouvelle chaîne commence
+        // chaque fois que "Ordre" NE progresse PAS strictement par rapport à la ligne
+        // précédente (redescend à 1, ou se répète) — signe qu'on repart d'un nouveau
+        // point de départ WIP pour le même code FG (ex: chaîne standard vs chaîne
+        // Chine pour 5010001).
+        function splitIntoChains(groupLines) {
+          const chains = [];
+          let current = [];
+          let prevOrdre = -Infinity;
+          groupLines.forEach(l => {
+            if (l.ordre <= prevOrdre && current.length) { chains.push(current); current = []; }
+            current.push(l);
+            prevOrdre = l.ordre;
+          });
+          if (current.length) chains.push(current);
+          return chains.map(c => [...c].sort((a,b) => a.ordre - b.ordre));
+        }
+
         const newCorrespondances = [];
         const newNomenclatures = [];
 
         Object.keys(groups).forEach(codeClient => {
-          const etapes = groups[codeClient];
-          const first = etapes[0];
+          const chains = splitIntoChains(groups[codeClient]);
 
-          // Correspondance : pointe vers le PREMIER niveau WIP (comme avant)
-          newCorrespondances.push({
-            client: first.client,
-            famille: first.famille,
-            code_client: codeClient,
-            libelle_fg: first.libelle_fg,
-            codart_wip: first.codart_wip,
+          chains.forEach((etapes, chainIdx) => {
+            const first = etapes[0];
+            const chainSuffix = chainIdx > 0 ? '__v' + (chainIdx+1) : '';
+
+            // Correspondance : une seule par code_client (la 1ère chaîne = chaîne
+            // "standard", sert de référence pour l'autocomplétion/l'affichage général).
+            // Les chaînes suivantes ne créent pas de doublon dans la liste de
+            // références — seule leur nomenclature (le calcul de stock) est ajoutée.
+            if (chainIdx === 0) {
+              newCorrespondances.push({
+                client: first.client,
+                famille: first.famille,
+                code_client: codeClient,
+                libelle_fg: first.libelle_fg,
+                codart_wip: first.codart_wip,
+              });
+            }
+
+            if (etapes.length > 1) {
+              newNomenclatures.push({
+                id: 'imp_' + codeClient.replace(/[^a-zA-Z0-9]/g,'_') + chainSuffix,
+                code_client: codeClient, // champ explicite : permet de retrouver TOUTES
+                                          // les chaînes d'un même code FG (pdpFindAllNomenclatures)
+                nom: first.client + ' — ' + first.libelle_fg + ' (' + codeClient + ')' + (chainIdx>0 ? ' [variante '+(chainIdx+1)+']' : ''),
+                etapes: etapes.map(e => ({
+                  codart: e.codart_wip,
+                  label: e.label_etape || e.codart_wip,
+                  ratio: (e.ratio === null || isNaN(e.ratio)) ? null : e.ratio,
+                  // Restriction de zone (ex: "BCHINE") : cette étape ne doit compter que
+                  // le stock physiquement dans cette zone, pas le stock général.
+                  zoneRestrict: e.matiere || null,
+                })),
+              });
+            }
           });
-
-          // Nomenclature uniquement si plusieurs étapes
-          if (etapes.length > 1) {
-            newNomenclatures.push({
-              id: 'imp_' + codeClient.replace(/[^a-zA-Z0-9]/g,'_'),
-              nom: first.client + ' — ' + first.libelle_fg + ' (' + codeClient + ')',
-              etapes: etapes.map(e => ({
-                codart: e.codart_wip,
-                label: e.label_etape || e.codart_wip,
-                ratio: (e.ratio === null || isNaN(e.ratio)) ? null : e.ratio,
-              })),
-            });
-          }
         });
 
         pdpImportedCorrespondances = newCorrespondances;
