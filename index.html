@@ -4394,7 +4394,9 @@ if (window._pdpPrefsToRestore) {
 // pultrusion, forecast, OF de pultrusion) maintenant que tous les modules sont
 // chargés — voir loadData() dans le script principal, qui les avait mis de côté
 // dans window._extraDataToRestore le temps que ces scripts arrivent.
+let _hadDeferredDataToRestore = false;
 if (window._extraDataToRestore) {
+  _hadDeferredDataToRestore = true;
   const ex = window._extraDataToRestore;
   if (ex.pdpImportedCorrespondances && typeof pdpImportedCorrespondances !== 'undefined') pdpImportedCorrespondances = ex.pdpImportedCorrespondances;
   if (ex.nomenclatures && typeof nomenclatures !== 'undefined') { nomenclatures.length = 0; ex.nomenclatures.forEach(n => nomenclatures.push(n)); }
@@ -4408,8 +4410,13 @@ if (window._extraDataToRestore) {
   if (ex.pultOFs && typeof pultOFs !== 'undefined') pultOFs = ex.pultOFs;
   delete window._extraDataToRestore;
 }
-// Re-render si on était sur une vue PDP/Stock pendant le chargement différé
-if (typeof currentView !== 'undefined' && (currentView === 'pdp' || currentView === 'stock')) {
+// Re-render si des données étaient en attente, quelle que soit la vue active —
+// PDP, Stock, mais aussi Ventes & couverture, Besoins, Commandes (Devis), etc.
+// dépendent toutes de nomenclatures/pdpImportedCorrespondances. Se limiter à
+// 'pdp'/'stock' laissait ces autres onglets figés sur le premier rendu (avant
+// l'arrivée des données différées) jusqu'au prochain changement d'onglet —
+// signalé par Stéphane le 14/08/2026 ("le stock disparaît aussitôt").
+if (_hadDeferredDataToRestore && typeof render === 'function') {
   render();
 }
 </script>
