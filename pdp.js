@@ -108,10 +108,16 @@ function pdpFindAllNomenclatures(codart_wip, code_client) {
 // Stock d'une étape, en respectant sa restriction de zone éventuelle (ex:
 // "BCHINE") — sinon le calcul général habituel (nomGetStock, ou zones client
 // dédié si fourni).
-function pdpStockForEtape(e, zones, i, blisterIdx) {
+function pdpStockForEtape(e, zones, i, blisterIdx, defaultStockFn) {
   if (e.zoneRestrict) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, [e.zoneRestrict]) : 0;
   if (zones && i === blisterIdx) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.blister) : 0;
   if (zones && i > blisterIdx) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.fg) : 0;
+  // Fonction de repli fournie par l'appelant (comportement D'ORIGINE de CET
+  // appelant précis, avant l'ajout du support multi-chaînes) — ne pas figer sur
+  // nomGetStock ici : pdpGetTotalFGForRef utilisait pdpGetStockForWip directement,
+  // et remplacer par nomGetStock avait fait tomber tous les totaux à zéro pour
+  // Stéphane le 14/08/2026 (régression corrigée le jour même).
+  if (defaultStockFn) return defaultStockFn(e.codart);
   return (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
 }
 
@@ -160,7 +166,7 @@ function pdpGetTotalFGForRef(codart_wip, code_client) {
     for (let j = i; j < nom.etapes.length - 1; j++) {
       if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
     }
-    const stk = pdpStockForEtape(e, null, i, -1) + (i === 0 ? _enc(e.codart) : 0);
+    const stk = pdpStockForEtape(e, null, i, -1, _stk) + (i === 0 ? _enc(e.codart) : 0);
     return s + (cumRatio > 1 ? Math.floor(stk / cumRatio) : stk);
   }, 0), 0);
 }
@@ -175,6 +181,7 @@ function pdpGetTotalFGForRef(codart_wip, code_client) {
 function pdpGetTotalFGForRefZoned(codart_wip, code_client, zones) {
   if (!zones || !zones.blister || !zones.fg) return pdpGetTotalFGForRef(codart_wip, code_client);
 
+  const _stkFull = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip : () => 0;
   const _stkZone = (c, z) => (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(c, z) : 0;
   const _enc = (typeof pdpGetEnCoursForWip === 'function') ? pdpGetEnCoursForWip : () => 0;
 
@@ -203,7 +210,7 @@ function pdpGetTotalFGForRefZoned(codart_wip, code_client, zones) {
     for (let j = i; j < nom.etapes.length - 1; j++) {
       if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
     }
-    const stk = pdpStockForEtape(e, zones, i, chainIdx === 0 ? blisterIdx : -1) + (i === 0 ? _enc(e.codart) : 0);
+    const stk = pdpStockForEtape(e, zones, i, chainIdx === 0 ? blisterIdx : -1, _stkFull) + (i === 0 ? _enc(e.codart) : 0);
     return s + (cumRatio > 1 ? Math.floor(stk / cumRatio) : stk);
   }, 0), 0);
 }
