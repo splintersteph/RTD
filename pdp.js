@@ -941,9 +941,15 @@ function _pdpSegmentCount(codart_wip) {
 }
 
 function _pdpLenVariant(str) {
-  const segs = String(str||'').split(/[_\-\s]+/);
-  const seg = segs.find(s => /^L\d{2,3}$/i.test(s));
-  return seg ? seg.toUpperCase() : null;
+  // Recherche "L" + 2 ou 3 chiffres n'importe où dans la chaîne, pas seulement
+  // comme segment isolé entre séparateurs — certains codart_wip ont L27 collé
+  // au segment précédent sans underscore (ex: "K07L27_JNT_XRO_1"), ce qui
+  // empêchait de détecter la variante longueur côté référence alors que l'OF
+  // correspondant l'avait bien détectée (ex: OF "K07 L27", "L27" isolé par un
+  // espace) — les deux étaient alors traités comme des variantes différentes
+  // et la correspondance rejetée à tort.
+  const m = String(str||'').toUpperCase().match(/L(\d{2,3})(?!\d)/);
+  return m ? 'L'+m[1] : null;
 }
 
 // Trouve les OFs en cours (Kanban) correspondant à une référence WIP
