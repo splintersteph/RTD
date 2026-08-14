@@ -553,7 +553,7 @@ function setSaveStatus(s,msg) {
 async function loadData() {
   loadEmbedded();
   try {
-    const res = await fetch(API,{signal:AbortSignal.timeout(4000)});
+    const res = await fetch(API,{signal:AbortSignal.timeout(4000),cache:'no-store'});
     if (!res.ok) throw new Error('HTTP '+res.status);
     const d = await res.json();
     ofs=d.ofs||[]; archives=d.archives||[]; nextId=d.nextId||1;
@@ -652,7 +652,7 @@ function preserveScroll(fn) {
 setInterval(async()=>{
   if (!serverAvailable) return;
   try {
-    const r=await fetch(API,{signal:AbortSignal.timeout(3000)});
+    const r=await fetch(API,{signal:AbortSignal.timeout(3000),cache:'no-store'});
     const d=await r.json();
     ofs=d.ofs||[]; archives=d.archives||[]; nextId=d.nextId||nextId;
     sanitizeOfStages();
