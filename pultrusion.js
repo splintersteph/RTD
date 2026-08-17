@@ -248,6 +248,18 @@ function pultTotalStock(ref) {
   return (ref.stockMezzLots||0) + (ref.stockRtdLots||0) + (ref.lotsAttente||0);
 }
 
+// Stock live (en mètres) d'une zone précise pour une référence — utilisé pour
+// les colonnes "Stock RTD (BSBAS1)" / "Stock Ecopark (ECOSTK)" du tableau.
+// Retourne null si aucun stock live n'est disponible pour cette référence
+// (pas seulement 0 pour cette zone précise — 0 et "pas de donnée" sont
+// affichés différemment).
+function pultGetZoneML(code, zone) {
+  if (pultGetLiveStock(code) === null) return null; // pas de stock live du tout pour cette référence
+  const byZone = pultGetLiveStockByZone(code);
+  const found = byZone.find(z => z.zone === zone);
+  return found ? found.ml : 0;
+}
+
 // true si le stock affiché est calculé en direct depuis pcData.stock (fiable,
 // à jour), false s'il s'agit du repli sur la photo figée du fichier d'origine.
 function pultIsLiveStock(ref) {
@@ -513,10 +525,41 @@ function pultImportForecast(input) {
 
 // ── Rendu principal ──────────────────────────────────────────────────────────
 let pultSearchFilter = '';
-let pultSortField = 'couverture'; // 'couverture' | 'alpha' | 'conso'
-function pultSetSort(val) {
-  pultSortField = val;
+let pultSortField = 'couverture'; // 'couverture' | 'alpha' | 'client' | 'stock' | 'stockMl' | 'stockRTD' | 'stockEco' | 'conso'
+let pultSortDir = 'asc';
+function pultSetSort(field) {
+  if (pultSortField === field) {
+    pultSortDir = pultSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    pultSortField = field;
+    pultSortDir = 'asc';
+  }
   renderPultrusionPage();
+}
+// Compare deux lignes déjà enrichies (couverture/stock/stockMl/stockRTD/stockEco/
+// conso calculés) selon la colonne et la direction actives. Les valeurs
+// manquantes (null) sont toujours reléguées en fin de liste, quelle que soit
+// la direction, pour ne pas les faire remonter artificiellement en tri
+// décroissant.
+function pultCompareRows(a, b) {
+  const field = pultSortField, dir = pultSortDir;
+  let va, vb;
+  switch (field) {
+    case 'alpha':     va = a.r.code;   vb = b.r.code;   break;
+    case 'client':    va = a.r.client; vb = b.r.client; break;
+    case 'stock':     va = a.stock;    vb = b.stock;    break;
+    case 'stockMl':   va = a.stockMlDisplay; vb = b.stockMlDisplay; break;
+    case 'stockRTD':  va = a.stockRTD; vb = b.stockRTD; break;
+    case 'stockEco':  va = a.stockEco; vb = b.stockEco; break;
+    case 'conso':     va = a.conso;    vb = b.conso;    break;
+    default:          va = a.couverture; vb = b.couverture;
+  }
+  const na = va === null || va === undefined, nb = vb === null || vb === undefined;
+  if (na && nb) return 0;
+  if (na) return 1;
+  if (nb) return -1;
+  const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+  return dir === 'asc' ? cmp : -cmp;
 }
 let _pultSearchTimer = null;
 function pultSearch(val) {
@@ -693,63 +736,69 @@ function renderPultrusionPage() {
     return hist[annees[annees.length - 1]];
   }
 
-  const withCouverture = refs.map(r => ({ r, couverture: pultCouvertureMois(r), stock: pultTotalStock(r), conso: pultDerniereConso(r) }));
+  const withCouverture = refs.map(r => {
+    const liveMl = pultGetLiveStock(r.code);
+    return {
+      r,
+      couverture: pultCouvertureMois(r),
+      stock: pultTotalStock(r),
+      conso: pultDerniereConso(r),
+      stockMlDisplay: liveMl !== null ? liveMl : (r.stockMezzMl + r.stockRtdMl),
+      stockRTD: pultGetZoneML(r.code, 'BSBAS1'),
+      stockEco: pultGetZoneML(r.code, 'ECOSTK'),
+    };
+  });
 
-  if (pultSortField === 'alpha') {
-    withCouverture.sort((a,b) => a.r.code.localeCompare(b.r.code));
-  } else if (pultSortField === 'conso') {
-    withCouverture.sort((a,b) => {
-      const na = a.conso===null, nb = b.conso===null;
-      if (na && nb) return 0;
-      if (na) return 1;
-      if (nb) return -1;
-      return b.conso - a.conso; // plus consommé d'abord
-    });
-  } else {
-    withCouverture.sort((a,b) => {
-      const na = a.couverture===null, nb = b.couverture===null;
-      if (na && nb) return 0;
-      if (na) return 1;
-      if (nb) return -1;
-      return a.couverture - b.couverture;
-    });
-  }
+  withCouverture.sort(pultCompareRows);
 
   const nbCritique = withCouverture.filter(x => x.couverture !== null && x.couverture < 1).length;
   const nbSurveiller = withCouverture.filter(x => x.couverture !== null && x.couverture >= 1 && x.couverture < 3).length;
 
-  // ── Cartes de références ────────────────────────────────────────────────
-  const cardsHtml = withCouverture.map(({r, couverture, stock}) => {
+  // ── Tableau de références ───────────────────────────────────────────────
+  const sortArrow = (field) => pultSortField === field ? (pultSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  const th = (label, field, align) => `<th onclick="pultSetSort('${field}')" style="cursor:pointer;user-select:none;white-space:nowrap${align?';text-align:'+align:''}" title="Trier par ${label}">${label}${sortArrow(field)}</th>`;
+
+  const rowsHtml = withCouverture.map(({r, couverture, stock, stockMlDisplay, stockRTD, stockEco}) => {
     const style = pultCouvertureStyle(couverture);
     const composition = [r.fibre, r.rowing, r.resine].filter(Boolean).join(' · ');
     const ofsRef = pultOFs.filter(o => o.code === r.code);
     const isLive = pultIsLiveStock(r);
-    const liveMl = pultGetLiveStock(r.code);
-    const stockMlDisplay = liveMl !== null ? liveMl : (r.stockMezzMl + r.stockRtdMl);
-    return `<div onclick="pultShowDetail('${r.code.replace(/'/g,"\\'")}')" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid ${style.dot};border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseleave="this.style.boxShadow='none'">
-      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700">${r.code}${isLive ? ' <i class="ti ti-refresh" style="font-size:10px;color:#1D9E75;vertical-align:2px" title="Stock en direct depuis le fichier importé"></i>' : ' <i class="ti ti-clock-pause" style="font-size:10px;color:var(--text-faint);vertical-align:2px" title="Photo figée — importe un stock à jour pour un chiffre en direct"></i>'}</div>
-          <div style="font-size:10px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${composition}">${composition}</div>
-        </div>
-        <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:${style.bg};color:${style.text};flex-shrink:0">${pultFmtMois(couverture)}</span>
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px"><i class="ti ti-building-factory" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${r.client}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
-        <div style="background:var(--bg);border-radius:6px;padding:6px 8px">
-          <div style="color:var(--text-faint);font-size:9px;text-transform:uppercase">Stock lots</div>
-          <div style="font-weight:700">${stock.toLocaleString('fr',{maximumFractionDigits:1})}</div>
-        </div>
-        <div style="background:var(--bg);border-radius:6px;padding:6px 8px">
-          <div style="color:var(--text-faint);font-size:9px;text-transform:uppercase">Stock mètres</div>
-          <div style="font-weight:700">${stockMlDisplay.toLocaleString('fr')}</div>
-        </div>
-      </div>
-      ${r.lotsAttente > 0 ? `<div style="margin-top:6px;font-size:10px;color:var(--text-muted)"><i class="ti ti-clock" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>${r.lotsAttente.toLocaleString('fr',{maximumFractionDigits:1})} lot(s) en attente de contrôle</div>` : ''}
-      ${r.limiteBasse!==null && stock < r.limiteBasse ? `<div style="margin-top:6px;font-size:10px;font-weight:600;color:#A32D2D"><i class="ti ti-alert-triangle" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Sous la limite basse (${r.limiteBasse.toLocaleString('fr',{maximumFractionDigits:1})})</div>` : ''}
-      ${ofsRef.length ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px">${ofsRef.map(o => `<span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;background:#FFF4E6;color:#92400E">${o.id} · ${o.qty}L</span>`).join('')}</div>` : ''}
-    </div>`;
+    const sousLimite = r.limiteBasse !== null && stock < r.limiteBasse;
+    const fmtZone = (v) => v === null ? '<span style="color:var(--text-faint)">—</span>' : v.toLocaleString('fr');
+    return `<tr onclick="pultShowDetail('${r.code.replace(/'/g,"\\'")}')" style="cursor:pointer" onmouseenter="this.style.background='var(--accent-light)'" onmouseleave="this.style.background=''">
+      <td>
+        <div style="font-weight:700;font-size:13px">${r.code}${isLive ? ' <i class="ti ti-refresh" style="font-size:10px;color:#1D9E75;vertical-align:1px" title="Stock en direct"></i>' : ' <i class="ti ti-clock-pause" style="font-size:10px;color:var(--text-faint);vertical-align:1px" title="Photo figée"></i>'}</div>
+        <div style="font-size:10px;color:var(--text-faint)" title="${composition}">${composition}</div>
+      </td>
+      <td style="font-size:12px;color:var(--text-muted)">${r.client}</td>
+      <td style="text-align:center"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:${style.bg};color:${style.text}">${pultFmtMois(couverture)}</span></td>
+      <td style="text-align:right;font-size:12px;font-weight:700${sousLimite?';color:#A32D2D':''}">${stock.toLocaleString('fr',{maximumFractionDigits:1})}</td>
+      <td style="text-align:right;font-size:12px">${stockMlDisplay.toLocaleString('fr')}</td>
+      <td style="text-align:right;font-size:12px">${fmtZone(stockRTD)}</td>
+      <td style="text-align:right;font-size:12px">${fmtZone(stockEco)}</td>
+      <td style="font-size:10px;color:var(--text-muted)">
+        ${r.lotsAttente > 0 ? `<span title="Lots en attente de contrôle"><i class="ti ti-clock" style="vertical-align:-1px"></i> ${r.lotsAttente.toLocaleString('fr',{maximumFractionDigits:1})}</span>` : ''}
+        ${sousLimite ? `<span style="color:#A32D2D;font-weight:600;margin-left:6px" title="Sous la limite basse (${r.limiteBasse.toLocaleString('fr',{maximumFractionDigits:1})})"><i class="ti ti-alert-triangle" style="vertical-align:-1px"></i> Limite basse</span>` : ''}
+        ${ofsRef.length ? ofsRef.map(o => `<span style="font-size:9px;font-weight:600;padding:1px 6px;border-radius:20px;background:#FFF4E6;color:#92400E;margin-left:4px">${o.id} · ${o.qty}L</span>`).join('') : ''}
+      </td>
+    </tr>`;
   }).join('');
+
+  const tableHtml = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto">
+    <table class="cat-table" style="width:100%">
+      <thead><tr>
+        ${th('Référence','alpha')}
+        ${th('Client','client')}
+        ${th('Couverture','couverture','center')}
+        ${th('Stock lots','stock','right')}
+        ${th('Stock mètres','stockMl','right')}
+        ${th('Stock RTD (BSBAS1)','stockRTD','right')}
+        ${th('Stock Ecopark (ECOSTK)','stockEco','right')}
+        <th>Alertes / OF</th>
+      </tr></thead>
+      <tbody>${rowsHtml || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune référence</td></tr>'}</tbody>
+    </table>
+  </div>`;
 
   // ── OFs de pultrusion en cours ──────────────────────────────────────────
   const refOptions = refs.map(r => `<option value="${r.code}">${r.code} — ${r.client}</option>`).join('');
@@ -771,11 +820,6 @@ function renderPultrusionPage() {
     + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
     + '<h2 style="font-size:17px;font-weight:600"><i class="ti ti-columns-2" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Pultrusion</h2>'
     + '<input id="pult-search" placeholder="Filtrer (référence, client, fibre)…" value="'+pultSearchFilter+'" oninput="pultSearch(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:240px">'
-    + '<select onchange="pultSetSort(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none">'
-    + '<option value="couverture"'+(pultSortField==='couverture'?' selected':'')+'>Trier : couverture (critique d\'abord)</option>'
-    + '<option value="alpha"'+(pultSortField==='alpha'?' selected':'')+'>Trier : alphabétique</option>'
-    + '<option value="conso"'+(pultSortField==='conso'?' selected':'')+'>Trier : plus consommé</option>'
-    + '</select>'
     + '<div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center">'
     + (nbCritique ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FCEBEB;color:#A32D2D"><i class="ti ti-alert-circle" style="vertical-align:-2px;margin-right:4px"></i>${nbCritique} &lt; 1 mois</span>` : '')
     + (nbSurveiller ? `<span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#FEF5E7;color:#633806"><i class="ti ti-clock" style="vertical-align:-2px;margin-right:4px"></i>${nbSurveiller} &lt; 3 mois</span>` : '')
@@ -786,7 +830,7 @@ function renderPultrusionPage() {
   html += '<div style="flex:1;overflow-y:auto;padding:16px 20px">';
 
   html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px">Stock de joncs ('+refs.length+' références)</div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:24px">' + (cardsHtml || '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-faint)">Aucune référence</div>') + '</div>';
+  html += tableHtml + '<div style="margin-bottom:24px"></div>';
 
   html += '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px">OF(s) de pultrusion en cours</div>';
 
