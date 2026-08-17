@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """PlanProd - Serveur Render (sans base de données)"""
-import json, os, sys, base64, secrets
+import json, os, sys, base64, secrets, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime
 
 PORT = int(os.environ.get("PORT", 8765))
 DATA_FILE = os.environ.get("DATA_PATH", "donnees.json")
+
+# Verrou protégeant les accès à DATA_FILE — indispensable depuis le passage à
+# ThreadingHTTPServer (chaque requête tourne dans son propre thread) : sans ce
+# verrou, deux sauvegardes simultanées (ex: une venant d'un import Pultrusion
+# et une autre du scheduleSave() habituel, arrivées à quelques millisecondes
+# d'écart) peuvent entrelacer leurs écritures et corrompre ou vider
+# donnees.json — cause probable de la perte d'OF constatée par Stéphane le
+# 15/08/2026, juste après le passage en mode multi-thread.
+_data_lock = threading.RLock()
 
 # Identifiants HTTP Basic Auth — à définir dans les variables d'environnement
 # Render (Settings > Environment), jamais en dur dans le code. Si absentes,
@@ -23,37 +32,45 @@ INITIAL_DATA = '{"ofs": [{"id": "OF-74041", "produit": "AE2_ILLUSION_X-RO", "qty
 INITIAL_DATA_PARSED = json.loads(INITIAL_DATA)
 
 def load_data():
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, encoding="utf-8") as f:
-                d = json.load(f)
-            # Mettre à jour le catalogue avec la version initiale (tenons_ml, longueur, tc_trs)
-            # On écrase le catalogue mais on garde les OF, archives, objectifs, machines
-            d["catalogue"] = INITIAL_DATA_PARSED["catalogue"]
-            if "durees_etapes" not in d:
-                d["durees_etapes"] = INITIAL_DATA_PARSED.get("durees_etapes", {})
-            print(f"[DATA] Catalogue mis à jour : {len(d['catalogue'])} références")
-            save_data(d)
-            return d
-        except Exception as e:
-            print(f"[DATA] Lecture échouée : {e}")
-    print("[DATA] Fichier absent — utilisation des données initiales")
-    d = INITIAL_DATA_PARSED
-    save_data(d)
-    return d
+    with _data_lock:
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, encoding="utf-8") as f:
+                    d = json.load(f)
+                # Mettre à jour le catalogue avec la version initiale (tenons_ml, longueur, tc_trs)
+                # On écrase le catalogue mais on garde les OF, archives, objectifs, machines
+                d["catalogue"] = INITIAL_DATA_PARSED["catalogue"]
+                if "durees_etapes" not in d:
+                    d["durees_etapes"] = INITIAL_DATA_PARSED.get("durees_etapes", {})
+                print(f"[DATA] Catalogue mis à jour : {len(d['catalogue'])} références")
+                save_data(d)
+                return d
+            except Exception as e:
+                print(f"[DATA] Lecture échouée : {e}")
+        print("[DATA] Fichier absent — utilisation des données initiales")
+        d = INITIAL_DATA_PARSED
+        save_data(d)
+        return d
 
 def save_data(data):
-    try:
-        # Backup
-        if os.path.exists(DATA_FILE):
-            import shutil
-            shutil.copy2(DATA_FILE, DATA_FILE + ".bak")
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        print(f"[DATA] Écriture échouée : {e}", file=sys.stderr)
-        return False
+    with _data_lock:
+        try:
+            # Backup
+            if os.path.exists(DATA_FILE):
+                import shutil
+                shutil.copy2(DATA_FILE, DATA_FILE + ".bak")
+            # Écriture atomique : passer par un fichier temporaire puis renommer
+            # (os.replace est atomique sur les systèmes POSIX, dont Render) —
+            # si le processus est interrompu en cours d'écriture (redémarrage,
+            # crash), DATA_FILE reste intact plutôt que tronqué/corrompu.
+            tmp_file = DATA_FILE + ".tmp"
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_file, DATA_FILE)
+            return True
+        except Exception as e:
+            print(f"[DATA] Écriture échouée : {e}", file=sys.stderr)
+            return False
 
 class Handler(BaseHTTPRequestHandler):
 
