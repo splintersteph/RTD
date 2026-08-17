@@ -278,8 +278,16 @@ function renderPdpPage() {
       const refs = byClient[cl];
       let totalStock=0, totalCdes=0;
       refs.forEach(r => {
-        totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
-        totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+        try {
+          totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+          totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+        } catch (err) {
+          // Une référence mal formée ne doit pas faire planter tout le total du
+          // client (et par ricochet, comme forEach s'arrête sur une exception,
+          // tous les clients suivants dans la boucle englobante) — voir le même
+          // correctif dans renderGridBody/renderTile.
+          console.error('[PDP] Erreur de calcul stock pour', r.code_client, ':', err);
+        }
       });
       const solde = totalStock - totalCdes;
       const soldeOk = solde >= 0;
@@ -325,8 +333,12 @@ function renderPdpPage() {
         const refs = byFamille[f];
         let totalStock=0, totalCdes=0;
         refs.forEach(r => {
-          totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
-          totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+          try {
+            totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+            totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+          } catch (err) {
+            console.error('[PDP] Erreur de calcul stock pour', r.code_client, ':', err);
+          }
         });
         const solde = totalStock - totalCdes;
         const ok = solde >= 0;
@@ -378,8 +390,12 @@ function renderPdpPage() {
     // Totaux client
     let totalStock=0, totalCdes=0;
     refs.forEach(r => {
-      totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
-      totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+      try {
+        totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+        totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+      } catch (err) {
+        console.error('[PDP] Erreur de calcul stock pour', r.code_client, ':', err);
+      }
     });
 
     // KPIs client
@@ -416,7 +432,7 @@ function renderPdpPage() {
       let levels = [];
       if (noms.length) {
         noms.forEach((nom, chainIdx) => {
-          const etapes = nom.etapes;
+          const etapes = (nom && Array.isArray(nom.etapes)) ? nom.etapes : [];
           etapes.forEach((e, i) => {
             // Ratio cumulatif : produit des ratios de l'étape i jusqu'à la fin DE CETTE CHAÎNE
             let cumRatio = 1;
@@ -617,12 +633,25 @@ function renderPdpPage() {
       list.forEach(r => {
         if (seen.has(r.code_client)) return;
         const group = groupsMap[r.codart_wip];
-        if (group.length > 1) {
-          group.forEach(g => seen.add(g.code_client));
-          html += renderFamilyGroup(group);
-        } else {
+        try {
+          if (group.length > 1) {
+            group.forEach(g => seen.add(g.code_client));
+            html += renderFamilyGroup(group);
+          } else {
+            seen.add(r.code_client);
+            html += renderTile(r);
+          }
+        } catch (err) {
+          // Une référence mal formée ne doit jamais faire disparaître tout le
+          // reste de la grille — isolé après le signalement de Stéphane
+          // (14-15/08/2026) : tout le stock de l'onglet PDP disparaissait après
+          // le rafraîchissement automatique, symptôme d'une exception non
+          // gérée dans le rendu d'une seule tuile qui interrompait toute la boucle.
+          console.error('[PDP] Erreur de rendu pour la référence', r.code_client, ':', err);
           seen.add(r.code_client);
-          html += renderTile(r);
+          html += '<div style="background:var(--surface);border:1px solid #A32D2D;border-radius:var(--radius);padding:12px 14px;color:#A32D2D;font-size:12px">'
+            + '<i class="ti ti-alert-triangle" style="margin-right:6px"></i>Erreur d\'affichage : ' + r.code_client
+            + '</div>';
         }
       });
       return html + '</div>';
