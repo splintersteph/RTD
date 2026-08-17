@@ -1551,7 +1551,17 @@ function pdpImportCorrespondances(input) {
                   ratio: (e.ratio === null || isNaN(e.ratio)) ? null : e.ratio,
                   // Restriction de zone (ex: "BCHINE") : cette étape ne doit compter que
                   // le stock physiquement dans cette zone, pas le stock général.
-                  zoneRestrict: e.matiere || null,
+                  // La colonne "Matière" sert à DEUX choses différentes selon la ligne :
+                  // pour la quasi-totalité des références, elle indique le TYPE DE
+                  // MATIÈRE PREMIÈRE (jonc) utilisé, ex: "JTO_ROUGE_2.5" — une info
+                  // descriptive, PAS un emplacement de stock. Seule la valeur "BCHINE"
+                  // est un vrai marqueur de zone de stock dédiée (voir 5010001). Traiter
+                  // n'importe quelle valeur non-vide comme une restriction de zone
+                  // envoyait la recherche de stock vers une zone appelée "JTO_ROUGE_2.5"
+                  // (qui n'existe pas), ramenant le stock à 0 pour presque toutes les
+                  // références. Bug introduit le 14/08/2026, trouvé et corrigé le
+                  // 15/08/2026 grâce aux tests en direct de Stéphane dans la console.
+                  zoneRestrict: (e.matiere === 'BCHINE') ? e.matiere : null,
                 })),
               });
             }
