@@ -3478,6 +3478,26 @@ function renderImportsMenu() {
   `;
 }
 
+// Normalise les champs date d'une ligne "commandes" importée en chaînes
+// YYYY-MM-DD calculées avec cdeToISODate (fiable quelle que soit
+// l'interprétation de SheetJS), AVANT tout JSON.stringify. Indispensable :
+// JSON.stringify() appelle automatiquement .toISOString() sur un objet Date
+// (comportement natif de Date.prototype.toJSON), ce qui figerait un résultat
+// potentiellement décalé dans les données sauvegardées, rendant inopérant
+// tout correctif appliqué seulement à l'affichage (constaté le 18/08/2026 :
+// décalage identique après le passage de cdeToISODate au "truc du midi",
+// preuve que la valeur stockée était déjà corrompue avant même la lecture).
+const CDE_DATE_FIELDS = ['DATDEL', 'DATDEM', 'DATE_COMMA', 'DÉLAI_CONF', 'DATE_BL'];
+function cdeNormalizeDateFields(rows) {
+  return rows.map(r => {
+    const out = Object.assign({}, r);
+    CDE_DATE_FIELDS.forEach(f => {
+      if (out[f] != null && typeof cdeToISODate === 'function') out[f] = cdeToISODate(out[f]);
+    });
+    return out;
+  });
+}
+
 function pcImport(type, input) {
   const file = input.files[0]; if (!file) return;
   const today = new Date().toLocaleDateString('fr-FR') + ' ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
@@ -3485,7 +3505,7 @@ function pcImport(type, input) {
   readExcelFile(file, rows => {
     if (type === 'of')        { pcData.ofEnCours = rows;  pcData.lastImport.of = today; }
     if (type === 'stock')     { pcData.stock = rows;       pcData.lastImport.stock = today; }
-    if (type === 'commandes') { pcData.commandes = rows;   pcData.lastImport.commandes = today; }
+    if (type === 'commandes') { pcData.commandes = cdeNormalizeDateFields(rows);   pcData.lastImport.commandes = today; }
     showToast('✓ ' + rows.length + ' lignes importées');
     scheduleSave(); // pousse pcData sur le serveur pour qu'il survive au prochain rechargement
     if (currentView === 'stock') renderStockPage();
