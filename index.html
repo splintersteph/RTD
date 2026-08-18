@@ -375,6 +375,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
     <div class="stats-bar" id="stats-bar"></div>
     <div class="content">
       <div class="kanban" id="kanban-view"></div>
+      <div class="flex-view" id="kanban-view-forets" style="display:flex"></div>
       <div class="list-view" id="list-view"></div>
       <div class="flex-view" id="archive-view"></div>
       <div class="flex-view" id="view-3m"></div>
@@ -605,6 +606,7 @@ function scheduleSave() {
             pultRefsImported: typeof pultRefsImported!=='undefined'?pultRefsImported:null,
             pultForecastImported: typeof pultForecastImported!=='undefined'?pultForecastImported:null,
             pultOFs: typeof pultOFs!=='undefined'?pultOFs:[],
+            ofsForets: typeof ofsForets!=='undefined'?ofsForets:[],
           }}),
         signal:AbortSignal.timeout(10000)});
       if (!res.ok) throw new Error();
@@ -685,6 +687,7 @@ setInterval(async()=>{
       if(ex.pultRefsImported && typeof pultRefsImported!=='undefined') pultRefsImported=ex.pultRefsImported;
       if(ex.pultForecastImported && typeof pultForecastImported!=='undefined') pultForecastImported=ex.pultForecastImported;
       if(ex.pultOFs && typeof pultOFs!=='undefined') pultOFs=ex.pultOFs;
+      if(ex.ofsForets && typeof ofsForets!=='undefined') ofsForets=ex.ofsForets;
     }
     // Ne pas perturber la vue en cours — juste mettre à jour les compteurs
     renderStats();buildSidebar();renderAlertBanner();
@@ -1072,6 +1075,7 @@ function renderKanban(){
       <div class="kanban-body">${cards.length?cards.map(o=>cardHtml(o,s)).join(''):'<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:20px 0">Aucun OF</div>'}</div>
     </div>`;
   }).join('');
+  if (typeof renderKanbanForets === 'function') renderKanbanForets();
 }
 
 function cardHtml(o,s){
@@ -2373,6 +2377,7 @@ function setView(v,pushState=true){
   if(pushState&&location.hash!=='#'+v)history.pushState({view:v},'','#'+v);
   const views={kanban:'kanban-view',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
   Object.entries(views).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.style.display=k===v?'flex':'none';});
+  const kvf=document.getElementById('kanban-view-forets');if(kvf)kvf.style.display=(v==='kanban')?'flex':'none';
   document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.remove('active'));
   const navMap={kanban:'nav-kanban',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
   if(navMap[v])document.getElementById(navMap[v])?.classList.add('active');
@@ -4399,6 +4404,7 @@ loadData();
 <script src="/pdp.js"></script>
 <script src="/gantt.js"></script>
 <script src="/pultrusion.js"></script>
+<script src="/forets.js"></script>
 <script>
 // Appliquer les préférences PDP maintenant que pdp.js est chargé
 if (window._pdpPrefsToRestore) {
@@ -4428,6 +4434,16 @@ if (window._extraDataToRestore) {
   if (ex.pultRefsImported && typeof pultRefsImported !== 'undefined') pultRefsImported = ex.pultRefsImported;
   if (ex.pultForecastImported && typeof pultForecastImported !== 'undefined') pultForecastImported = ex.pultForecastImported;
   if (ex.pultOFs && typeof pultOFs !== 'undefined') pultOFs = ex.pultOFs;
+  if (ex.ofsForets && typeof ofsForets !== 'undefined') {
+    ofsForets = ex.ofsForets;
+    // Reprendre le compteur d'id après le plus grand id restauré, pour ne
+    // jamais réattribuer un id déjà utilisé aux prochains OF Forets créés.
+    const maxN = ofsForets.reduce((m, o) => {
+      const n = parseInt(String(o.id).replace('OFR-', ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    if (typeof _foretsNextId !== 'undefined') _foretsNextId = maxN + 1;
+  }
   delete window._extraDataToRestore;
 }
 // Re-render si des données étaient en attente, quelle que soit la vue active —
