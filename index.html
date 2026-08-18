@@ -2373,7 +2373,7 @@ function render(){
   else if(currentView==='planning')renderPlanningComposite();
 }
 
-const VALID_VIEWS=['kanban','list','archives','3m','catalogue','gantt','stats','pdp','besoins','conso','stock','commandes','planning','pultrusion'];
+const VALID_VIEWS=['kanban','forets','list','archives','3m','catalogue','gantt','stats','pdp','besoins','conso','stock','commandes','planning','pultrusion'];
 
 function setView(v,pushState=true){
   if(!VALID_VIEWS.includes(v))v='kanban';
