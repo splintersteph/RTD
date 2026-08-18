@@ -1393,6 +1393,32 @@ function pdpShowDetail(code_client) {
       })()
     + '</div>'
 
+    // À produire — détail du calcul (commandes + stock cible 2 mois − stock
+    // actuel) — demandé par Stéphane, 18/08/2026, pour voir le détail plutôt
+    // que juste le chiffre final affiché sur la tuile.
+    + (() => {
+        if (typeof consoGetMoyenneMensuelle !== 'function') return '';
+        const moyenne = consoGetMoyenneMensuelle(code_client);
+        if (!moyenne || moyenne <= 0) return '';
+        const stockCible = Math.round(moyenne * PDP_MOIS_STOCK_CIBLE);
+        const aProduire = pdpQtyAProduire(code_client, totalFG, totalCde);
+        const resColor = aProduire > 0 ? '#92400E' : '#27500A';
+        const resBg = aProduire > 0 ? '#FFF4E6' : '#EAF3DE';
+        const ligne = (label, val, color) => '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0">'
+          + '<span style="color:var(--text-muted)">'+label+'</span>'
+          + '<strong style="color:'+color+'">'+val+'</strong></div>';
+        return '<div style="background:var(--bg);border-radius:var(--radius);padding:12px 14px">'
+          + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">'
+          + '<i class="ti ti-calculator" style="vertical-align:-2px;margin-right:5px"></i>À produire \u2014 d\u00e9tail du calcul</div>'
+          + ligne('Commandes ouvertes', '+ '+totalCde.toLocaleString('fr'), '#A32D2D')
+          + ligne('Stock cible ('+PDP_MOIS_STOCK_CIBLE+' mois \u00d7 '+Math.round(moyenne).toLocaleString('fr')+' u/mois en moyenne)', '+ '+stockCible.toLocaleString('fr'), '#633806')
+          + ligne('Stock actuel (tous niveaux)', '\u2212 '+totalFG.toLocaleString('fr'), '#27500A')
+          + '<div style="border-top:1px dashed var(--border-med);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:center">'
+          + '<span style="font-size:12px;font-weight:600">= \u00c0 produire</span>'
+          + '<span style="font-size:15px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+resBg+';color:'+resColor+'">'+aProduire.toLocaleString('fr')+'</span>'
+          + '</div></div>';
+      })()
+
     // Niveaux de stock (arborescence)
     + '<div>'
     + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Niveaux de stock</div>'
