@@ -326,6 +326,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-section">Vues</div>
     <button class="sidebar-item active" id="nav-kanban" onclick="setView('kanban')"><i class="ti ti-layout-columns"></i>Kanban</button>
+    <button class="sidebar-item" id="nav-forets" onclick="setView('forets')"><i class="ti ti-circle-dot"></i>Forets</button>
     <button class="sidebar-item" id="nav-list" onclick="setView('list')"><i class="ti ti-list-details"></i>Liste</button>
     <button class="sidebar-item" id="nav-archives" onclick="setView('archives')"><i class="ti ti-archive"></i>Archives<span class="sidebar-badge" id="badge-archives">0</span></button>
     <button class="sidebar-item" id="nav-3m" onclick="setView('3m')"><i class="ti ti-star"></i>Objectif 3M</button>
@@ -374,17 +375,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
     </div>
     <div class="stats-bar" id="stats-bar"></div>
     <div class="content">
-      <div class="flex-view" id="kanban-combined" style="display:flex;padding:0;gap:0">
-        <div id="kanban-tenons-wrap" style="display:flex;flex-direction:column;height:70vh;flex-shrink:0">
-          <div style="display:flex;align-items:center;gap:10px;padding:14px 24px 8px">
-            <h2 style="font-size:14px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Kanban Tenons</h2>
-            <div style="flex:1"></div>
-            <button class="btn" style="font-size:12px;padding:5px 10px" id="kanban-tenons-toggle-btn" onclick="toggleKanbanTenons()"><i class="ti ti-chevron-up"></i> Réduire</button>
-          </div>
-          <div class="kanban" id="kanban-view" style="padding:0 24px;flex:1;min-height:0"></div>
-        </div>
-        <div id="kanban-view-forets"></div>
-      </div>
+      <div class="kanban" id="kanban-view"></div>
+      <div class="flex-view" id="view-forets" style="padding:0"></div>
       <div class="list-view" id="list-view"></div>
       <div class="flex-view" id="archive-view"></div>
       <div class="flex-view" id="view-3m"></div>
@@ -1084,22 +1076,6 @@ function renderKanban(){
       <div class="kanban-body">${cards.length?cards.map(o=>cardHtml(o,s)).join(''):'<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:20px 0">Aucun OF</div>'}</div>
     </div>`;
   }).join('');
-  if (typeof renderKanbanForets === 'function') renderKanbanForets();
-}
-
-// Réduit/affiche le bloc Kanban Tenons (demandé par Stéphane, 18/08/2026, pour
-// pouvoir masquer l'un ou l'autre des deux Kanban empilés — tenons et forets).
-let kanbanTenonsCollapsed = false;
-function toggleKanbanTenons() {
-  kanbanTenonsCollapsed = !kanbanTenonsCollapsed;
-  const kv = document.getElementById('kanban-view');
-  const wrap = document.getElementById('kanban-tenons-wrap');
-  const btn = document.getElementById('kanban-tenons-toggle-btn');
-  if (kv) kv.style.display = kanbanTenonsCollapsed ? 'none' : 'flex';
-  if (wrap) wrap.style.height = kanbanTenonsCollapsed ? '0' : '70vh';
-  if (btn) btn.innerHTML = kanbanTenonsCollapsed
-    ? '<i class="ti ti-chevron-down"></i> Afficher'
-    : '<i class="ti ti-chevron-up"></i> Réduire';
 }
 
 function cardHtml(o,s){
@@ -2360,6 +2336,10 @@ function importData(event) {
 function render(){
   renderStats();buildSidebar();renderAlertBanner();
   if(currentView==='kanban')renderKanban();
+  else if(currentView==='forets'){
+    if(typeof renderKanbanForets==='function')renderKanbanForets();
+    else document.getElementById('view-forets').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Forets…</div>';
+  }
   else if(currentView==='list')renderList();
   else if(currentView==='archives')renderArchives();
   else if(currentView==='3m')render3M();
@@ -2399,10 +2379,10 @@ function setView(v,pushState=true){
   if(!VALID_VIEWS.includes(v))v='kanban';
   currentView=v;
   if(pushState&&location.hash!=='#'+v)history.pushState({view:v},'','#'+v);
-  const views={kanban:'kanban-combined',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
+  const views={kanban:'kanban-view',forets:'view-forets',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
   Object.entries(views).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.style.display=k===v?'flex':'none';});
   document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.remove('active'));
-  const navMap={kanban:'nav-kanban',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
+  const navMap={kanban:'nav-kanban',forets:'nav-forets',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
   if(navMap[v])document.getElementById(navMap[v])?.classList.add('active');
   if(v==='kanban'||v==='list'){sideFilter='all';stageFilter='';}
   document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));

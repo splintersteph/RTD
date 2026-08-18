@@ -81,23 +81,17 @@ function foretsRatio(o, stageId) {
   return e.qty / o.qtyOF;
 }
 
-// ─── RENDU KANBAN ──────────────────────────────────────────────────────────
-let foretsKanbanCollapsed = false;
-function foretsToggleCollapse() {
-  foretsKanbanCollapsed = !foretsKanbanCollapsed;
-  renderKanbanForets();
-}
-
+// ─── RENDU (onglet dédié) ──────────────────────────────────────────────────
 function renderKanbanForets() {
-  const el = document.getElementById('kanban-view-forets');
+  const el = document.getElementById('view-forets');
   if (!el) return;
   const active = ofsForets.filter(o => !o.archived);
 
   const header = `
-    <div style="display:flex;align-items:center;gap:10px;margin:0;padding:14px 24px 8px;border-top:1px solid var(--border)">
-      <h2 style="font-size:14px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px">
-        <i class="ti ti-circle-dot" style="color:#D4880A"></i>Kanban Forets
-        <span style="font-weight:500;color:var(--text-faint);text-transform:none;letter-spacing:0">(${active.length} OF)</span>
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--surface)">
+      <h2 style="font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px">
+        <i class="ti ti-circle-dot" style="color:#D4880A"></i>Forets
+        <span style="font-size:13px;font-weight:500;color:var(--text-faint)">(${active.length} OF)</span>
       </h2>
       <div style="flex:1"></div>
       <label class="btn" style="font-size:12px;padding:5px 10px;cursor:pointer">
@@ -105,19 +99,13 @@ function renderKanbanForets() {
         <input type="file" accept=".xlsx,.xls,.xlsb" style="display:none" onchange="foretsImportFile(this)">
       </label>
       <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="foretsOpenNew()"><i class="ti ti-plus"></i>Nouvel OF Foret</button>
-      <button class="btn" style="font-size:12px;padding:5px 10px" onclick="foretsToggleCollapse()">${foretsKanbanCollapsed ? '<i class="ti ti-chevron-down"></i> Afficher' : '<i class="ti ti-chevron-up"></i> Réduire'}</button>
     </div>`;
-
-  if (foretsKanbanCollapsed) {
-    el.innerHTML = header;
-    return;
-  }
 
   // Tri par n° OF croissant, comme le fichier de suivi source.
   const sorted = [...active].sort((a, b) => (Number(a.numOF) || 0) - (Number(b.numOF) || 0));
 
   el.innerHTML = header
-    + '<div style="padding:0 24px 24px;overflow-x:auto">'
+    + '<div style="flex:1;overflow:auto;padding:16px 24px">'
     + '<table class="cat-table" style="min-width:1500px;white-space:nowrap">'
     + '<thead><tr>'
     + '<th>Machine</th><th>Date OF</th><th>N° OF</th><th>Référence</th><th style="text-align:right">Qté OF</th>'
