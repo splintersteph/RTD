@@ -330,13 +330,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
     <button class="sidebar-item" id="nav-list" onclick="setView('list')"><i class="ti ti-list-details"></i>Liste</button>
     <button class="sidebar-item" id="nav-archives" onclick="setView('archives')"><i class="ti ti-archive"></i>Archives<span class="sidebar-badge" id="badge-archives">0</span></button>
     <button class="sidebar-item" id="nav-3m" onclick="setView('3m')"><i class="ti ti-star"></i>Objectif 3M</button>
-    <button class="sidebar-item" id="nav-catalogue" onclick="setView('catalogue')"><i class="ti ti-database"></i>Catalogue</button>
     <button class="sidebar-item" id="nav-gantt" onclick="setView('gantt')"><i class="ti ti-calendar-stats"></i>Gantt</button>
     <button class="sidebar-item" id="nav-stats" onclick="setView('stats')"><i class="ti ti-chart-bar"></i>Statistiques</button>
     <button class="sidebar-item" id="nav-pdp" onclick="setView('pdp')"><i class="ti ti-chart-bar"></i>PDP</button>
     <button class="sidebar-item" id="nav-besoins" onclick="setView('besoins')"><i class="ti ti-alert-triangle"></i>Besoins</button>
     <button class="sidebar-item" id="nav-conso" onclick="setView('conso')"><i class="ti ti-trending-up"></i>Consommation</button>
-    <button class="sidebar-item" id="nav-stock" onclick="setView('stock')"><i class="ti ti-package"></i>Stock</button>
     <button class="sidebar-item" id="nav-commandes" onclick="setView('commandes')"><i class="ti ti-shopping-cart"></i>Commandes</button>
     <button class="sidebar-item" id="nav-planning" onclick="setView('planning')"><i class="ti ti-table-import"></i>Planning Composite</button>
     <button class="sidebar-item" id="nav-pultrusion" onclick="setView('pultrusion')"><i class="ti ti-columns-2"></i>Pultrusion</button>
@@ -380,14 +378,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
       <div class="list-view" id="list-view"></div>
       <div class="flex-view" id="archive-view"></div>
       <div class="flex-view" id="view-3m"></div>
-      <div class="flex-view" id="view-catalogue"></div>
       <div class="flex-view" id="view-gantt" style="overflow:auto"></div>
       <div class="flex-view" id="view-stats"></div>
       <div class="flex-view" id="view-pdp"></div>
       <div class="flex-view" id="view-besoins"></div>
       <div class="flex-view" id="view-conso"></div>
       <div class="flex-view" id="view-pultrusion"></div>
-      <div class="flex-view" id="view-stock"></div>
       <div class="flex-view" id="view-commandes"></div>
       <div class="flex-view" id="view-planning"></div>
     </div>
@@ -2343,7 +2339,6 @@ function render(){
   else if(currentView==='list')renderList();
   else if(currentView==='archives')renderArchives();
   else if(currentView==='3m')render3M();
-  else if(currentView==='catalogue')renderCatalogue();
   else if(currentView==='gantt')renderGantt();
   else if(currentView==='stats')renderStatsPage();
   else if(currentView==='pdp'){
@@ -2362,10 +2357,6 @@ function render(){
     if(typeof renderPultrusionPage==='function')renderPultrusionPage();
     else document.getElementById('view-pultrusion').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Pultrusion…</div>';
   }
-  else if(currentView==='stock'){
-    if(typeof renderStockPage==='function')renderStockPage();
-    else document.getElementById('view-stock').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Stock…</div>';
-  }
   else if(currentView==='commandes'){
     if(typeof renderCommandesPage==='function')renderCommandesPage();
     else document.getElementById('view-commandes').innerHTML='<div style="padding:40px;text-align:center;color:var(--text-faint)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px"></i>Chargement du module Commandes…</div>';
@@ -2373,22 +2364,22 @@ function render(){
   else if(currentView==='planning')renderPlanningComposite();
 }
 
-const VALID_VIEWS=['kanban','forets','list','archives','3m','catalogue','gantt','stats','pdp','besoins','conso','stock','commandes','planning','pultrusion'];
+const VALID_VIEWS=['kanban','forets','list','archives','3m','gantt','stats','pdp','besoins','conso','commandes','planning','pultrusion'];
 
 function setView(v,pushState=true){
   if(!VALID_VIEWS.includes(v))v='kanban';
   currentView=v;
   if(pushState&&location.hash!=='#'+v)history.pushState({view:v},'','#'+v);
-  const views={kanban:'kanban-view',forets:'view-forets',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
+  const views={kanban:'kanban-view',forets:'view-forets',list:'list-view',archives:'archive-view','3m':'view-3m',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
   Object.entries(views).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.style.display=k===v?'flex':'none';});
   document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.remove('active'));
-  const navMap={kanban:'nav-kanban',forets:'nav-forets',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
+  const navMap={kanban:'nav-kanban',forets:'nav-forets',list:'nav-list',archives:'nav-archives','3m':'nav-3m',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
   if(navMap[v])document.getElementById(navMap[v])?.classList.add('active');
   if(v==='kanban'||v==='list'){sideFilter='all';stageFilter='';}
   document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
-  const bnMap={kanban:'bn-kanban',list:'bn-list',archives:'bn-archives','3m':'bn-3m',catalogue:'bn-catalogue',gantt:'bn-gantt'};
+  const bnMap={kanban:'bn-kanban',list:'bn-list',archives:'bn-archives','3m':'bn-3m',gantt:'bn-gantt'};
   if(bnMap[v])document.getElementById(bnMap[v])?.classList.add('active');
-  const labels={kanban:'Kanban',list:'Liste',archives:'Archives','3m':'Objectif 3M',catalogue:'Catalogue',gantt:'Gantt',stats:'Statistiques',pdp:'PDP',besoins:'Besoins',conso:'Consommation',stock:'Stock',commandes:'Commandes',planning:'Planning Composite',pultrusion:'Pultrusion'};
+  const labels={kanban:'Kanban',list:'Liste',archives:'Archives','3m':'Objectif 3M',gantt:'Gantt',stats:'Statistiques',pdp:'PDP',besoins:'Besoins',conso:'Consommation',commandes:'Commandes',planning:'Planning Composite',pultrusion:'Pultrusion'};
   document.title='PlanProd — '+(labels[v]||v);
   render();
 }
