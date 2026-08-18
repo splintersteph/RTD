@@ -81,6 +81,35 @@ function foretsRatio(o, stageId) {
   return e.qty / o.qtyOF;
 }
 
+// ─── INTÉGRATION PDP / BESOINS (en-cours de production) ───────────────────
+// Les OF Forets utilisent une référence courte (W0, W1, DT1…) alors que les
+// nomenclatures PDP identifient le premier niveau WIP par un codart du type
+// "FINITION_DRILL_W#0" / "FINITION_DRILL_DT1" (voir PDP_CORRESPONDANCES /
+// nomenclatures dans pdp.js) — demandé par Stéphane, 18/08/2026, pour que les
+// OF Forets en cours comptent dans le stock équivalent FG (comme le fait déjà
+// l'en-cours tenons) et apparaissent dans les badges "En prod" du PDP/Besoins.
+function foretsReferenceToCodartWip(ref) {
+  const r = String(ref || '').trim().toUpperCase();
+  if (!r) return null;
+  if (r === 'WU' || r === 'W#UNI' || r === 'WUNI') return 'FINITION_DRILL_W#UNI';
+  const mW = r.match(/^W(\d+)$/);
+  if (mW) return 'FINITION_DRILL_W#' + mW[1];
+  const mDT = r.match(/^DT(\d+(?:[.,]\d+)?)$/);
+  if (mDT) return 'FINITION_DRILL_DT' + mDT[1].replace(',', '.');
+  return null;
+}
+
+// Retourne les OF Forets non terminés liés à un codart_wip donné, au même
+// format que pdpGetOFsForRef (pdp.js) — {id, qty} — pour pouvoir les
+// concaténer directement aux OF tenons dans les badges "En prod".
+function foretsGetOFsForRef(codart_wip) {
+  if (typeof ofsForets === 'undefined' || !codart_wip) return [];
+  const target = String(codart_wip).trim().toUpperCase();
+  return ofsForets
+    .filter(o => !o.archived && foretsReferenceToCodartWip(o.reference) === target)
+    .map(o => ({ id: 'OFR-' + o.numOF, qty: o.qtyOF || 0 }));
+}
+
 // ─── RENDU (onglet dédié) ──────────────────────────────────────────────────
 function renderKanbanForets() {
   const el = document.getElementById('view-forets');

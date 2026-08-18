@@ -409,7 +409,7 @@ function renderPdpPage() {
       +'<div style="font-size:22px;font-weight:700;color:#185FA5">'+totalStock.toLocaleString('fr')+'</div></div>'
       +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px">'
       +'<div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">En production</div>'
-      +'<div style="font-size:22px;font-weight:700;color:#D4880A">'+(typeof ofs!=='undefined'?ofs.filter(o=>refs.some(r=>pdpGetOFsForRef(r.codart_wip,pdpAutoShortName(r)).some(x=>x.id===o.id))).reduce((s,o)=>s+(o.qty||0),0):0).toLocaleString('fr')+'</div></div>'
+      +'<div style="font-size:22px;font-weight:700;color:#D4880A">'+((typeof ofs!=='undefined'?ofs.filter(o=>refs.some(r=>pdpGetOFsForRef(r.codart_wip,pdpAutoShortName(r)).some(x=>x.id===o.id))).reduce((s,o)=>s+(o.qty||0),0):0)+(typeof foretsGetOFsForRef==='function'?refs.reduce((s,r)=>s+foretsGetOFsForRef(r.codart_wip).reduce((s2,o)=>s2+(o.qty||0),0),0):0)).toLocaleString('fr')+'</div></div>'
       +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px">'
       +'<div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Commandes</div>'
       +'<div style="font-size:22px;font-weight:700;color:#A32D2D">'+totalCdes.toLocaleString('fr')+'</div></div>'
@@ -470,7 +470,8 @@ function renderPdpPage() {
       // Nom personnalisé > nom court auto-détecté (W0, W1, K101...) > libellé complet
       const autoShort = pdpAutoShortName(r);
       const displayName = r._shortName || autoShort;
-      const ofsEnCours = pdpGetOFsForRef(r.codart_wip, autoShort);
+      const ofsEnCours = pdpGetOFsForRef(r.codart_wip, autoShort)
+        .concat(typeof foretsGetOFsForRef === 'function' ? foretsGetOFsForRef(r.codart_wip) : []);
 
       return '<div data-pdp-action="show-detail" data-pdp-arg="' + r.code_client + '" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:box-shadow .15s;display:flex;flex-direction:column;gap:8px;cursor:pointer"'
         +' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\'" onmouseleave="this.style.boxShadow=\'none\'">'
@@ -1264,7 +1265,8 @@ function pdpShowDetail(code_client) {
 
   // OFs en cours du Kanban liés à cette référence
   const autoShortM = pdpAutoShortName(ref);
-  const ofsModal = pdpGetOFsForRef(ref.codart_wip, autoShortM);
+  const ofsModal = pdpGetOFsForRef(ref.codart_wip, autoShortM)
+    .concat(typeof foretsGetOFsForRef === 'function' ? foretsGetOFsForRef(ref.codart_wip) : []);
 
   const displayName = pdpCustomNames[code_client] || ref.libelle_fg;
   const col = PDP_CLIENT_COLORS[ref.client] || RTD_FAM_COLORS[ref.famille] || {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};

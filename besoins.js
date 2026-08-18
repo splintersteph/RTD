@@ -102,14 +102,18 @@ function renderBesoinsPage() {
     const encWip = (typeof pdpGetEnCoursForWip === 'function') ? pdpGetEnCoursForWip(wipBrut.codart) : 0;
 
     // OFs en cours sur ce WIP
-    const ofsLies = (typeof ofs !== 'undefined')
+    // OFs en cours du Kanban liés à ce WIP — tenons ET Forets (foretsGetOFsForRef,
+    // voir forets.js ; demandé par Stéphane, 18/08/2026, pour que les OF Forets en
+    // cours apparaissent aussi ici, pas seulement dans le calcul de stock).
+    const ofsLies = ((typeof ofs !== 'undefined')
       ? ofs.filter(o => {
           if (typeof pdpGetOFsForRef === 'function') {
             return pdpGetOFsForRef(wipBrut.codart, displayName).some(ox => ox.id === o.id);
           }
           return false;
         })
-      : [];
+      : []
+    ).concat(typeof foretsGetOFsForRef === 'function' ? foretsGetOFsForRef(wipBrut.codart) : []);
     const qtyEnProd = ofsLies.reduce((s, o) => s + (o.qty || 0), 0);
 
     items.push({

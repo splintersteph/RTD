@@ -3881,6 +3881,22 @@ function pdpGetStockForZone(codart, zones) {
 // uniquement (pcCalcOF) — décision de Stéphane, "pour le moment". Le PDP ne
 // compte donc plus d'en-cours ici ; retourne toujours 0.
 function pdpGetEnCoursForWip(codart) {
+  // En-cours Forets : les OF Forets non terminés (voir forets.js — l'import
+  // exclut déjà les OF entièrement terminés) comptent comme du stock à venir
+  // pour leur référence, exactement comme le fait l'en-cours tenons ailleurs
+  // dans pdpGetTotalFGForRef (voir ses commentaires sur le risque de double
+  // comptage) — demandé par Stéphane, 18/08/2026. Le stub à 0 reste inchangé
+  // pour les tenons : ce n'est pas ce qui est demandé ici, et le changer
+  // rouvrirait un choix déjà fait ailleurs sans qu'on me le demande.
+  if (typeof foretsReferenceToCodartWip === 'function' && codart) {
+    const target = String(codart).trim().toUpperCase();
+    if (typeof ofsForets !== 'undefined') {
+      const qty = ofsForets
+        .filter(o => !o.archived && foretsReferenceToCodartWip(o.reference) === target)
+        .reduce((s, o) => s + (o.qtyOF || 0), 0);
+      if (qty) return qty;
+    }
+  }
   return 0;
 }
 
