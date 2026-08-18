@@ -159,13 +159,20 @@ function cdeToISODate(val) {
   if (!val) return null;
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return null;
-    // Getters LOCAUX (pas UTC) : contrairement à l'hypothèse initiale, la
-    // version de SheetJS utilisée ici construit apparemment les dates Excel en
-    // minuit LOCAL, pas en minuit UTC — les lire avec des getters UTC décalait
-    // systématiquement d'un jour en arrière pour un fuseau horaire en avance
-    // sur UTC (France). Revenu aux getters locaux suite à un signalement
-    // confirmant un écart constant d'1 jour avec la version UTC (12/08/2026).
-    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    // "Truc du midi" : ni les getters locaux ni les getters UTC seuls ne sont
+    // fiables ici, car selon la version de SheetJS et le contexte d'exécution,
+    // cellDates:true construit la date Excel tantôt à minuit LOCAL, tantôt à
+    // minuit UTC — un signalement le 12/08/2026 a justifié le passage aux
+    // getters locaux, un autre le 18/08/2026 (commande 16301 : 01/09 dans
+    // Excel, affiché 31/08 dans l'appli) montre que ce n'était pas suffisant
+    // (probablement un mélange des deux selon le champ/l'import). On décale
+    // donc l'instant de +12h avant de lire en UTC : que la construction
+    // d'origine soit minuit local ou minuit UTC, ce décalage retombe toujours
+    // au milieu de la bonne journée civile (les fuseaux concernés ici, France
+    // incluse, ont un décalage largement inférieur à 12h), donc le résultat
+    // est correct indépendamment de l'interprétation de départ.
+    const noon = new Date(val.getTime() + 12*60*60*1000);
+    const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();

@@ -794,10 +794,13 @@ function pdpToISODate(val) {
   if (!val) return null;
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return null;
-    // Getters LOCAUX — voir le même correctif (et la même explication) dans
-    // cdeToISODate (commandes.js) : revenu en arrière suite à un signalement
-    // confirmant un décalage constant d'1 jour avec la version UTC.
-    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    // "Truc du midi" — voir le même correctif (et la même explication) dans
+    // cdeToISODate (commandes.js) : ni les getters locaux ni UTC seuls ne sont
+    // fiables selon la façon dont SheetJS a construit la date en interne ; on
+    // décale de +12h avant de lire en UTC pour retomber sur le bon jour
+    // civil quelle que soit l'interprétation d'origine.
+    const noon = new Date(val.getTime() + 12*60*60*1000);
+    const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();
