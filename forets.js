@@ -105,9 +105,18 @@ function foretsReferenceToCodartWip(ref) {
 function foretsGetOFsForRef(codart_wip) {
   if (typeof ofsForets === 'undefined' || !codart_wip) return [];
   const target = String(codart_wip).trim().toUpperCase();
+  const STAGE_LABELS = { decolletage: 'Décolletage', rollomatic: 'Rollomatic', polissage: 'Électro-polissage', joint: 'Mise en joint', controle: 'Contrôle', termine: 'Terminé' };
   return ofsForets
     .filter(o => !o.archived && foretsReferenceToCodartWip(o.reference) === target)
-    .map(o => ({ id: 'OFR-' + o.numOF, qty: o.qtyOF || 0 }));
+    .map(o => ({
+      id: 'OFR-' + o.numOF,
+      qty: o.qtyOF || 0,
+      // produit/stage : la modale de détail PDP (pdpShowDetail) affiche ces
+      // champs pour chaque OF lié quel qu'il soit (tenon ou Foret) — sans
+      // eux elle afficherait "undefined".
+      produit: o.reference || '',
+      stage: STAGE_LABELS[foretsStageOf(o)] || '',
+    }));
 }
 
 // ─── RENDU (onglet dédié) ──────────────────────────────────────────────────
