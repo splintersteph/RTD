@@ -176,7 +176,27 @@ function cdeToISODate(val) {
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();
-  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  // Chaîne ISO avec horodatage (ex: "2026-08-31T21:59:39.000Z") — typiquement
+  // une valeur qui a déjà traversé un JSON.stringify() sur un objet Date (qui
+  // sérialise automatiquement en UTC). Un simple découpage des 10 premiers
+  // caractères prend alors le jour UTC brut, potentiellement décalé d'un jour
+  // par rapport au jour civil réel voulu (constaté le 18/08/2026 sur la
+  // commande 16301 : stockée "2026-08-31T21:59:39.000Z", jour réel 01/09).
+  // On applique donc le même "truc du midi" que pour les objets Date : décaler
+  // de +12h avant de lire en UTC retombe sur le bon jour quelle que soit
+  // l'origine du décalage (fuseau ou arrondi de l'export ERP).
+  const isoDateTime = s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  if (isoDateTime) {
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const noon = new Date(dt.getTime() + 12*60*60*1000);
+      const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
+      return y+'-'+m+'-'+d;
+    }
+  }
+  // Chaîne déjà au format YYYY-MM-DD pur (sans horodatage) : sans ambiguïté,
+  // on la prend telle quelle.
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) return isoMatch[1]+'-'+isoMatch[2]+'-'+isoMatch[3];
   const frMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (frMatch) return frMatch[3]+'-'+frMatch[2].padStart(2,'0')+'-'+frMatch[1].padStart(2,'0');

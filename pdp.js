@@ -804,8 +804,20 @@ function pdpToISODate(val) {
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();
-  // Déjà au format YYYY-MM-DD (ou avec heure ISO)
-  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  // Chaîne ISO avec horodatage — même correctif (et même explication) que
+  // cdeToISODate (commandes.js) : appliquer le "truc du midi" avant de lire
+  // en UTC, plutôt qu'un découpage brut des 10 premiers caractères.
+  const isoDateTime = s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  if (isoDateTime) {
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const noon = new Date(dt.getTime() + 12*60*60*1000);
+      const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
+      return y+'-'+m+'-'+d;
+    }
+  }
+  // Déjà au format YYYY-MM-DD pur
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) return isoMatch[1]+'-'+isoMatch[2]+'-'+isoMatch[3];
   // Format DD/MM/YYYY
   const frMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
