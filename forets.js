@@ -312,7 +312,7 @@ function foretsImportFile(input) {
 
         const get = (row, key) => row[colRef + FORETS_COL_OFFSETS[key]];
 
-        let nbCrees = 0, nbMaj = 0, nbIgnores = 0;
+        let nbCrees = 0, nbMaj = 0, nbIgnores = 0, nbTermines = 0;
         for (let r = headerRow + 1; r < rows.length; r++) {
           const row = rows[r] || [];
           const numOFraw = get(row, 'numOF');
@@ -342,11 +342,22 @@ function foretsImportFile(input) {
           };
 
           const existing = ofsForets.find(o => o.numOF === numOF);
+          // Ne pas prendre en compte les OF déjà terminés (les 5 étapes
+          // renseignées) — demandé par Stéphane, 18/08/2026, pour ne garder
+          // dans le tableau que les OF encore en cours. Si un OF déjà importé
+          // (en cours) se termine dans ce nouvel import, on le retire plutôt
+          // que de laisser un état "en cours" périmé.
+          if (foretsStageOf({ etapes, qtyOF: data.qtyOF }) === 'termine') {
+            if (existing) { ofsForets = ofsForets.filter(o => o.numOF !== numOF); nbTermines++; }
+            else nbTermines++;
+            continue;
+          }
+
           if (existing) { Object.assign(existing, data); nbMaj++; }
           else { ofsForets.push(Object.assign({ id: foretsNewId(), archived: false }, data)); nbCrees++; }
         }
 
-        showToast(`✓ Import Forets : ${nbCrees} créé(s), ${nbMaj} mis à jour${nbIgnores ? ', ' + nbIgnores + ' ligne(s) ignorée(s)' : ''}`);
+        showToast(`✓ Import Forets : ${nbCrees} créé(s), ${nbMaj} mis à jour, ${nbTermines} terminé(s) ignoré(s)${nbIgnores ? ', ' + nbIgnores + ' ligne(s) ignorée(s)' : ''}`);
         renderKanbanForets();
         scheduleSave();
       } catch (err) {
