@@ -82,16 +82,22 @@ function foretsRatio(o, stageId) {
 }
 
 // ─── RENDU KANBAN ──────────────────────────────────────────────────────────
+let foretsKanbanCollapsed = false;
+function foretsToggleCollapse() {
+  foretsKanbanCollapsed = !foretsKanbanCollapsed;
+  renderKanbanForets();
+}
+
 function renderKanbanForets() {
   const el = document.getElementById('kanban-view-forets');
   if (!el) return;
   const active = ofsForets.filter(o => !o.archived);
 
   const header = `
-    <div style="display:flex;align-items:center;gap:10px;margin:22px 0 10px;padding-top:14px;border-top:1px solid var(--border)">
-      <h2 style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
+    <div style="display:flex;align-items:center;gap:10px;margin:0;padding:14px 24px 8px;border-top:1px solid var(--border)">
+      <h2 style="font-size:14px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px">
         <i class="ti ti-circle-dot" style="color:#D4880A"></i>Kanban Forets
-        <span style="font-size:11px;font-weight:500;color:var(--text-faint)">(${active.length} OF)</span>
+        <span style="font-weight:500;color:var(--text-faint);text-transform:none;letter-spacing:0">(${active.length} OF)</span>
       </h2>
       <div style="flex:1"></div>
       <label class="btn" style="font-size:12px;padding:5px 10px;cursor:pointer">
@@ -99,7 +105,13 @@ function renderKanbanForets() {
         <input type="file" accept=".xlsx,.xls,.xlsb" style="display:none" onchange="foretsImportFile(this)">
       </label>
       <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="foretsOpenNew()"><i class="ti ti-plus"></i>Nouvel OF Foret</button>
+      <button class="btn" style="font-size:12px;padding:5px 10px" onclick="foretsToggleCollapse()">${foretsKanbanCollapsed ? '<i class="ti ti-chevron-down"></i> Afficher' : '<i class="ti ti-chevron-up"></i> Réduire'}</button>
     </div>`;
+
+  if (foretsKanbanCollapsed) {
+    el.innerHTML = header;
+    return;
+  }
 
   const cols = FORETS_STAGES.map(s => {
     const cards = active.filter(o => foretsStageOf(o) === s.id);
@@ -121,7 +133,7 @@ function renderKanbanForets() {
     <div class="kanban-body">${termines.length ? termines.map(foretsCardHtml).join('') : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:20px 0">Aucun OF</div>'}</div>
   </div>`;
 
-  el.innerHTML = header + '<div class="kanban">' + cols + colTermine + '</div>';
+  el.innerHTML = header + '<div class="kanban" style="height:60vh;padding:0 24px 24px">' + cols + colTermine + '</div>';
 }
 
 function foretsCardHtml(o) {

@@ -374,8 +374,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
     </div>
     <div class="stats-bar" id="stats-bar"></div>
     <div class="content">
-      <div class="kanban" id="kanban-view"></div>
-      <div class="flex-view" id="kanban-view-forets" style="display:flex"></div>
+      <div class="flex-view" id="kanban-combined" style="display:flex;padding:0;gap:0">
+        <div id="kanban-tenons-wrap" style="display:flex;flex-direction:column;height:70vh;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 24px 8px">
+            <h2 style="font-size:14px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Kanban Tenons</h2>
+            <div style="flex:1"></div>
+            <button class="btn" style="font-size:12px;padding:5px 10px" id="kanban-tenons-toggle-btn" onclick="toggleKanbanTenons()"><i class="ti ti-chevron-up"></i> Réduire</button>
+          </div>
+          <div class="kanban" id="kanban-view" style="padding:0 24px;flex:1;min-height:0"></div>
+        </div>
+        <div id="kanban-view-forets"></div>
+      </div>
       <div class="list-view" id="list-view"></div>
       <div class="flex-view" id="archive-view"></div>
       <div class="flex-view" id="view-3m"></div>
@@ -1076,6 +1085,21 @@ function renderKanban(){
     </div>`;
   }).join('');
   if (typeof renderKanbanForets === 'function') renderKanbanForets();
+}
+
+// Réduit/affiche le bloc Kanban Tenons (demandé par Stéphane, 18/08/2026, pour
+// pouvoir masquer l'un ou l'autre des deux Kanban empilés — tenons et forets).
+let kanbanTenonsCollapsed = false;
+function toggleKanbanTenons() {
+  kanbanTenonsCollapsed = !kanbanTenonsCollapsed;
+  const kv = document.getElementById('kanban-view');
+  const wrap = document.getElementById('kanban-tenons-wrap');
+  const btn = document.getElementById('kanban-tenons-toggle-btn');
+  if (kv) kv.style.display = kanbanTenonsCollapsed ? 'none' : 'flex';
+  if (wrap) wrap.style.height = kanbanTenonsCollapsed ? '0' : '70vh';
+  if (btn) btn.innerHTML = kanbanTenonsCollapsed
+    ? '<i class="ti ti-chevron-down"></i> Afficher'
+    : '<i class="ti ti-chevron-up"></i> Réduire';
 }
 
 function cardHtml(o,s){
@@ -2375,9 +2399,8 @@ function setView(v,pushState=true){
   if(!VALID_VIEWS.includes(v))v='kanban';
   currentView=v;
   if(pushState&&location.hash!=='#'+v)history.pushState({view:v},'','#'+v);
-  const views={kanban:'kanban-view',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
+  const views={kanban:'kanban-combined',list:'list-view',archives:'archive-view','3m':'view-3m',catalogue:'view-catalogue',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',stock:'view-stock',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
   Object.entries(views).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.style.display=k===v?'flex':'none';});
-  const kvf=document.getElementById('kanban-view-forets');if(kvf)kvf.style.display=(v==='kanban')?'flex':'none';
   document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.remove('active'));
   const navMap={kanban:'nav-kanban',list:'nav-list',archives:'nav-archives','3m':'nav-3m',catalogue:'nav-catalogue',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',stock:'nav-stock',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
   if(navMap[v])document.getElementById(navMap[v])?.classList.add('active');
