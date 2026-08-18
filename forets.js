@@ -113,48 +113,52 @@ function renderKanbanForets() {
     return;
   }
 
-  const cols = FORETS_STAGES.map(s => {
-    const cards = active.filter(o => foretsStageOf(o) === s.id);
-    return `<div class="kanban-col">
-      <div class="kanban-head">
-        <div class="kanban-head-title"><span class="stage-dot" style="background:${s.color}"></span>${s.label}</div>
-        <div class="kanban-head-count">${cards.length} ordre${cards.length !== 1 ? 's' : ''}</div>
-      </div>
-      <div class="kanban-body">${cards.length ? cards.map(foretsCardHtml).join('') : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:20px 0">Aucun OF</div>'}</div>
-    </div>`;
-  }).join('');
+  // Tri par n° OF croissant, comme le fichier de suivi source.
+  const sorted = [...active].sort((a, b) => (Number(a.numOF) || 0) - (Number(b.numOF) || 0));
 
-  const termines = active.filter(o => foretsStageOf(o) === 'termine');
-  const colTermine = `<div class="kanban-col">
-    <div class="kanban-head">
-      <div class="kanban-head-title"><span class="stage-dot" style="background:#5A5A5A"></span>Terminé</div>
-      <div class="kanban-head-count">${termines.length} ordre${termines.length !== 1 ? 's' : ''}</div>
-    </div>
-    <div class="kanban-body">${termines.length ? termines.map(foretsCardHtml).join('') : '<div style="font-size:12px;color:var(--text-faint);text-align:center;padding:20px 0">Aucun OF</div>'}</div>
-  </div>`;
-
-  el.innerHTML = header + '<div class="kanban" style="height:60vh;padding:0 24px 24px">' + cols + colTermine + '</div>';
+  el.innerHTML = header
+    + '<div style="padding:0 24px 24px;overflow-x:auto">'
+    + '<table class="cat-table" style="min-width:1500px;white-space:nowrap">'
+    + '<thead><tr>'
+    + '<th>Machine</th><th>Date OF</th><th>N° OF</th><th>Référence</th><th style="text-align:right">Qté OF</th>'
+    + FORETS_STAGES.map(s => `<th colspan="2" style="text-align:center;border-left:2px solid var(--border)"><span class="stage-dot" style="background:${s.color}"></span>${s.label}</th>`).join('')
+    + '<th>Réception qualité</th><th>Informations</th>'
+    + '</tr></thead><tbody>'
+    + (sorted.length ? sorted.map(foretsRowHtml).join('') : '<tr><td colspan="20" style="text-align:center;color:var(--text-faint);padding:24px">Aucun OF Foret</td></tr>')
+    + '</tbody></table></div>';
 }
 
-function foretsCardHtml(o) {
-  const stageId = foretsStageOf(o);
-  const stage = FORETS_STAGES.find(s => s.id === stageId);
-  const ratio = stage ? foretsRatio(o, stageId) : null;
-  const lastDoneStage = [...FORETS_STAGE_IDS].reverse().find(id => o.etapes[id] && o.etapes[id].qty);
-  const lastDate = lastDoneStage ? o.etapes[lastDoneStage].date : o.dateOF;
-  return `<div class="of-card" style="background:var(--surface);border-left:3px solid ${stage ? stage.color : '#5A5A5A'}" onclick="foretsOpenDetail('${o.id}')">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <span class="of-ref">OF ${o.numOF}</span>
-      ${o.info ? '<i class="ti ti-message-circle-2" style="font-size:12px;color:var(--text-faint)" title="' + o.info.replace(/"/g, '&quot;') + '"></i>' : ''}
-    </div>
-    <div class="of-produit">${o.reference || '—'}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px;gap:6px">
-      <span style="font-size:10px;color:var(--text-faint)"><i class="ti ti-stack-2" style="font-size:10px;vertical-align:-1px"></i> ${(o.qtyOF || 0).toLocaleString('fr')}</span>
-      ${o.machine ? `<span style="font-size:10px;color:var(--text-faint)"><i class="ti ti-tool" style="font-size:10px;vertical-align:-1px"></i> ${o.machine}</span>` : ''}
-      ${ratio != null ? `<span style="font-size:9px;color:${ratio < 0.98 ? '#A32D2D' : 'var(--text-faint)'}">rdt ${Math.round(ratio * 1000) / 10}%</span>` : ''}
-    </div>
-    ${lastDate ? `<div style="margin-top:4px;font-size:9px;color:var(--text-faint)"><i class="ti ti-calendar" style="font-size:9px"></i> ${fmtDate(lastDate)}</div>` : ''}
-  </div>`;
+// Couleurs de rendement — mêmes codes que la mise en forme conditionnelle du
+// fichier source (vert proche de 100%, orange en dessous, rouge en-dessous
+// de 50% ou étape à l'arrêt), et palette déjà utilisée ailleurs dans l'appli
+// (of-deadline.late / .soon / stat vert).
+function foretsRatioStyle(ratio) {
+  if (ratio == null) return { bg: 'transparent', text: 'var(--text-faint)' };
+  if (ratio >= 0.95) return { bg: '#EAF3DE', text: '#27500A' };
+  if (ratio >= 0.5) return { bg: '#FAEEDA', text: '#633806' };
+  return { bg: '#FCEBEB', text: '#A32D2D' };
+}
+
+function foretsRowHtml(o) {
+  const stageCells = FORETS_STAGES.map(s => {
+    const e = (o.etapes && o.etapes[s.id]) || { qty: null, date: null };
+    const ratio = foretsRatio(o, s.id);
+    const style = foretsRatioStyle(ratio);
+    return `<td style="border-left:2px solid var(--border);font-size:12px;color:var(--text-muted)">${e.date ? fmtDate(e.date) : '—'}</td>`
+      + `<td style="text-align:right;font-size:12px;font-weight:600;background:${style.bg};color:${style.text}">`
+      + (e.qty ? e.qty.toLocaleString('fr') + (ratio != null ? ' <span style="font-weight:500;opacity:.85">(' + (Math.round(ratio * 1000) / 10) + '%)</span>' : '') : '—')
+      + '</td>';
+  }).join('');
+  return `<tr style="cursor:pointer" onclick="foretsOpenDetail('${o.id}')">
+    <td style="font-size:12px">${o.machine || '—'}</td>
+    <td style="font-size:12px;color:var(--text-muted)">${o.dateOF ? fmtDate(o.dateOF) : '—'}</td>
+    <td style="font-size:12px;font-weight:600;font-family:monospace;color:var(--accent)">${o.numOF}</td>
+    <td style="font-size:12px;font-weight:600">${o.reference || '—'}</td>
+    <td style="text-align:right;font-size:12px">${(o.qtyOF || 0).toLocaleString('fr')}</td>
+    ${stageCells}
+    <td style="font-size:12px;color:var(--text-muted)">${o.dateReception ? fmtDate(o.dateReception) : '—'}</td>
+    <td style="font-size:11px;color:var(--text-faint);white-space:normal;max-width:260px">${o.info || ''}</td>
+  </tr>`;
 }
 
 // ─── FORMULAIRE / DÉTAIL ───────────────────────────────────────────────────
