@@ -529,6 +529,19 @@ function renderPdpPage() {
           : '<span style="margin-left:auto;font-size:10px;font-weight:600;color:#27500A;background:#EAF3DE;padding:2px 8px;border-radius:20px;white-space:nowrap">\u2713 Couvert</span>')
         +'</div>'
 
+        // À produire pour reconstituer PDP_MOIS_STOCK_CIBLE mois de stock cible,
+        // en plus des commandes déjà en carnet — voir pdpQtyAProduire. Masqué si
+        // pas de consommation moyenne connue pour cette référence (pas de "—"
+        // inutile qui alourdirait toutes les tuiles sans donnée de vente).
+        +(() => {
+          const aProduire = pdpQtyAProduire(r.code_client, totalFG, cde);
+          if (aProduire === null) return '';
+          return '<div style="display:flex;align-items:center;gap:6px;padding-top:2px">'
+            +'<span style="font-size:10px;color:var(--text-faint)">À produire ('+PDP_MOIS_STOCK_CIBLE+' mois)</span>'
+            +'<span style="margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;background:'+(aProduire>0?'#FFF4E6':'#EAF3DE')+';color:'+(aProduire>0?'#92400E':'#27500A')+'">'+aProduire.toLocaleString('fr')+'</span>'
+            +'</div>';
+        })()
+
         // OFs en cours sur cette référence (Kanban)
         +(ofsEnCours.length > 0
           ? '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:6px">'
@@ -592,13 +605,17 @@ function renderPdpPage() {
         const cde = pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
         const ok = (totalFG - cde) >= 0;
         const rupture = pdpCalcRupture(r.code_client, totalFG);
+        const aProduire = pdpQtyAProduire(r.code_client, totalFG, cde);
         const displayName = r._shortName || pdpAutoShortName(r);
         return '<div data-pdp-action="show-detail" data-pdp-arg="'+r.code_client+'" style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;background:var(--surface)"'
           + ' onmouseenter="this.style.borderColor=\''+col.dot+'\'" onmouseleave="this.style.borderColor=\'var(--border)\'">'
           + '<div style="font-size:13px;font-weight:700;color:'+col.text+'">'+displayName+'</div>'
           + '<div style="font-size:9px;color:var(--text-faint);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+r.libelle_fg+'">'+r.libelle_fg+'</div>'
           + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:var(--text-faint)">Stock FG</span><strong>'+totalFG.toLocaleString('fr')+'</strong></div>'
-          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px"><span style="color:var(--text-faint)">Commandé</span><strong style="color:#A32D2D">'+cde.toLocaleString('fr')+'</strong></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:'+(aProduire!==null?'2':'8')+'px"><span style="color:var(--text-faint)">Commandé</span><strong style="color:#A32D2D">'+cde.toLocaleString('fr')+'</strong></div>'
+          + (aProduire !== null
+            ? '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px"><span style="color:var(--text-faint)">À produire ('+PDP_MOIS_STOCK_CIBLE+' mois)</span><strong style="color:'+(aProduire>0?'#92400E':'#27500A')+'">'+aProduire.toLocaleString('fr')+'</strong></div>'
+            : '')
           + (rupture
             ? '<span style="font-size:10px;font-weight:700;color:#A32D2D;background:#FCEBEB;padding:2px 8px;border-radius:20px"><i class="ti ti-alert-triangle" style="font-size:10px;vertical-align:-1px"></i> '+pdpFmtDate(rupture.date)+'</span>'
             : '<span style="font-size:10px;font-weight:600;color:#27500A;background:#EAF3DE;padding:2px 8px;border-radius:20px">\u2713 Couvert</span>')
@@ -794,35 +811,40 @@ function pdpToISODate(val) {
   if (!val) return null;
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return null;
-    // "Truc du midi" — voir le même correctif (et la même explication) dans
-    // cdeToISODate (commandes.js) : ni les getters locaux ni UTC seuls ne sont
-    // fiables selon la façon dont SheetJS a construit la date en interne ; on
-    // décale de +12h avant de lire en UTC pour retomber sur le bon jour
-    // civil quelle que soit l'interprétation d'origine.
-    const noon = new Date(val.getTime() + 12*60*60*1000);
-    const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
+    // Getters LOCAUX — voir le même correctif (et la même explication) dans
+    // cdeToISODate (commandes.js) : revenu en arrière suite à un signalement
+    // confirmant un décalage constant d'1 jour avec la version UTC.
+    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
     return y+'-'+m+'-'+d;
   }
   const s = String(val).trim();
-  // Chaîne ISO avec horodatage — même correctif (et même explication) que
-  // cdeToISODate (commandes.js) : appliquer le "truc du midi" avant de lire
-  // en UTC, plutôt qu'un découpage brut des 10 premiers caractères.
-  const isoDateTime = s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-  if (isoDateTime) {
-    const dt = new Date(s);
-    if (!isNaN(dt.getTime())) {
-      const noon = new Date(dt.getTime() + 12*60*60*1000);
-      const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
-      return y+'-'+m+'-'+d;
-    }
-  }
-  // Déjà au format YYYY-MM-DD pur
-  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  // Déjà au format YYYY-MM-DD (ou avec heure ISO)
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) return isoMatch[1]+'-'+isoMatch[2]+'-'+isoMatch[3];
   // Format DD/MM/YYYY
   const frMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (frMatch) return frMatch[3]+'-'+frMatch[2].padStart(2,'0')+'-'+frMatch[1].padStart(2,'0');
   return null;
+}
+
+// Mois de stock cible à reconstituer, en plus des commandes ouvertes —
+// demandé par Stéphane, 18/08/2026. Constante isolée pour pouvoir ajuster
+// facilement la cible plus tard sans chercher dans tout le fichier.
+const PDP_MOIS_STOCK_CIBLE = 2;
+
+// Quantité à produire = commandes ouvertes déjà en carnet + stock cible (N
+// mois de vente moyenne mensuelle, voir consoGetMoyenneMensuelle dans
+// conso.js) − stock FG actuel (tous niveaux, déjà fourni par l'appelant).
+// Retourne null quand la consommation moyenne n'est pas connue pour cette
+// référence (pas de vente historique importée) — on ne veut pas inventer un
+// chiffre à partir d'une moyenne à 0 ou inexistante, plutôt afficher "—".
+function pdpQtyAProduire(code_client, totalFG, cde) {
+  if (typeof consoGetMoyenneMensuelle !== 'function') return null;
+  const moyenne = consoGetMoyenneMensuelle(code_client);
+  if (!moyenne || moyenne <= 0) return null;
+  const stockCible = moyenne * PDP_MOIS_STOCK_CIBLE;
+  const besoin = (cde || 0) + stockCible - (totalFG || 0);
+  return Math.max(0, Math.ceil(besoin));
 }
 
 function pdpCalcRupture(fgCodeOrWip, stockDispo) {
