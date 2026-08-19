@@ -1213,6 +1213,39 @@ function pdpGetOFsForRef(codart_wip, shortName) {
   });
 }
 
+// Retrouve la référence PDP (correspondance) à laquelle un OF tenon donné est
+// rattaché — la recherche inverse de pdpGetOFsForRef, réutilisant EXACTEMENT
+// la même logique de correspondance floue (donc toujours cohérent avec les
+// badges "En prod" déjà affichés sur les tuiles) plutôt que de réimplémenter
+// un matching séparé. Demandé par Stéphane, 18/08/2026, pour pouvoir cliquer
+// sur le produit d'un OF (modale Kanban) et atterrir sur sa tuile PDP.
+function pdpFindRefForOF(o) {
+  if (!o || typeof pdpGetActiveCorrespondances !== 'function') return null;
+  const corrs = pdpGetActiveCorrespondances();
+  for (const r of corrs) {
+    const shortName = (typeof pdpCustomNames !== 'undefined' && pdpCustomNames[r.code_client])
+      || (typeof pdpAutoShortName === 'function' ? pdpAutoShortName(r) : null);
+    if (pdpGetOFsForRef(r.codart_wip, shortName).some(x => x.id === o.id)) return r;
+  }
+  return null;
+}
+
+// Ferme la modale OF, bascule sur l'onglet PDP et ouvre directement le détail
+// de la référence correspondante.
+function pdpGoToRefFromOF(ofId) {
+  const o = (typeof ofs !== 'undefined') ? ofs.find(x => x.id === ofId) : null;
+  if (!o) return;
+  const r = pdpFindRefForOF(o);
+  if (!r) {
+    if (typeof showToast === 'function') showToast('Référence PDP introuvable pour ce produit');
+    return;
+  }
+  if (typeof closeOverlay === 'function') closeOverlay();
+  if (typeof pdpSelectedClient !== 'undefined') pdpSelectedClient = r.client;
+  if (typeof setView === 'function') setView('pdp'); // appelle déjà render() en interne
+  if (typeof pdpShowDetail === 'function') pdpShowDetail(r.code_client);
+}
+
 
 // Résout un codart_wip vers le code FG final de sa nomenclature
 // Les commandes clients portent toujours sur le FG, jamais sur un WIP intermédiaire

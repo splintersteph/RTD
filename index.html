@@ -2440,7 +2440,7 @@ function openDetail(id){
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px">Calendrier</div>
       ${timelineHtml(o)}
       <div class="detail-grid" style="margin-top:16px">
-        <div class="dg-item"><label>Produit</label><p>${o.produit}</p></div>
+        <div class="dg-item"><label>Produit</label><p style="cursor:pointer;color:var(--accent);text-decoration:underline;text-underline-offset:2px" onclick="if(typeof pdpGoToRefFromOF==='function')pdpGoToRefFromOF('${o.id}')" title="Voir la tuile PDP correspondante">${o.produit}</p></div>
         <div class="dg-item"><label>Quantité</label><p>${o.qty.toLocaleString('fr')} u.</p></div>
         <div class="dg-item"><label>Étape</label><p><span class="stage-pill" style="background:${s.bg};color:${s.text}"><span class="stage-dot" style="background:${s.color};width:6px;height:6px"></span>${s.label}</span></p></div>
         <div class="dg-item"><label>Priorité</label><p><span class="prio-pill" style="background:${pc.bg};color:${pc.text}">${pc.label}</span></p></div>
