@@ -38,6 +38,24 @@ const INTROKITS = {
       { label: 'Blister W3', codart: 'BLISTER_W3_MDR',   qte: 1 },
     ],
   },
+  '4800002': {
+    nom: 'MATCHPOST INTROKIT B',
+    // Composition donnée par Stéphane le 18/08/2026 (export nomenclature SAP) —
+    // codarts pris directement au niveau des 5 lignes de tête (surlignées en
+    // bleu sur l'export), pas de correspondance nomenclatures/FINITION_* à
+    // construire ici : pdpGetStockForWip matche ces codes tels quels contre le
+    // stock importé (PTSTOCKSIMPLE), donc les codes SAP bruts fonctionnent
+    // directement. Déjà présent dans PDP_CORRESPONDANCES (client RTD, famille
+    // Consommables & accessoires) — pas de nouvelle tuile à créer, juste sa
+    // composition qui active le calcul de stock/à-produire spécifique kit.
+    composants: [
+      { label: 'Vrac MATCHPOST 5 posts 1.4', codart: '48100503', qte: 1 },
+      { label: 'Vrac MATCHPOST 5 posts 1.6', codart: '48100504', qte: 1 },
+      { label: 'Blister MATCHPOST Drills — starter #2 (1.4-1.6)', codart: '4820102V', qte: 1 },
+      { label: 'Blister MATCHPOST Drills — finishing 1.4', codart: '4820214V', qte: 1 },
+      { label: 'Blister MATCHPOST Drills — finishing 1.6', codart: '4820216V', qte: 1 },
+    ],
+  },
 };
 
 // Stock disponible en kits = le composant le plus rare (stock blister ÷
