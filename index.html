@@ -1105,7 +1105,32 @@ function cardHtml(o,s){
         return `<span class="of-deadline ${status}" style="margin-top:0"><i class="ti ti-calendar-due" style="font-size:9px"></i>${fin?fmtDate(fin):'?'}</span>`;
       })()}
     </div>
+    ${o.stage==='joint'?jointTypeHtml(o):''}
   </div>`;
+}
+
+// Bascule ESAT/RFIP pour un OF à l'étape "Mise en joint" — demandé par
+// Stéphane, 18/08/2026, pour repérer directement sur la carte Kanban si la
+// mise en joint est sous-traitée (ESAT) ou faite par RFIP. Un clic sur un
+// badge déjà actif le désélectionne (retour à "non renseigné") plutôt que de
+// forcer un choix entre les deux uniquement.
+function jointTypeHtml(o) {
+  const opt = (val, label) => {
+    const active = o.jointType === val;
+    return `<span onclick="event.stopPropagation();setJointType('${o.id}','${val}')"
+      style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;cursor:pointer;
+      background:${active?'#1D9E75':'var(--bg)'};color:${active?'#fff':'var(--text-faint)'};
+      border:1px solid ${active?'#1D9E75':'var(--border)'}">${label}</span>`;
+  };
+  return `<div style="display:flex;gap:5px;margin-top:6px" onclick="event.stopPropagation()">${opt('ESAT','ESAT')}${opt('RFIP','RFIP')}</div>`;
+}
+
+function setJointType(id, val) {
+  const o = ofs.find(x => x.id === id);
+  if (!o) return;
+  o.jointType = (o.jointType === val) ? null : val; // re-clic = désélectionne
+  renderKanban();
+  scheduleSave();
 }
 
 // ─── LIST VIEW ────────────────────────────────────────────────────────────────
