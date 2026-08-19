@@ -42,8 +42,12 @@ function renderGantt() {
   const today = new Date(); today.setHours(0,0,0,0);
 
   // OF à afficher selon le mode
-  // En vue "en cours" : uniquement les étapes avant contrôle (usinage, attente, création)
-  const STAGES_GANTT = ['creation', 'attente', 'usinage'];
+  // En vue "en cours" : les OF encore en amont/pendant l'usinage. "attente"
+  // vient APRÈS l'usinage dans l'ordre des étapes (creation → usinage →
+  // attente → contrôle → joint) — un OF en attente a donc déjà quitté la
+  // machine et ne doit plus s'afficher, demandé par Stéphane le 18/08/2026
+  // ("les OF disparaissent une fois qu'ils ne sont plus en usinage").
+  const STAGES_GANTT = ['creation', 'usinage'];
   const ofsActifs = ganttShowArchived
     ? archives.filter(a => a.archivedAt)
     : ofs.filter(o => STAGES_GANTT.includes(o.stage));
