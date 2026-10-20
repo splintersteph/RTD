@@ -1,0 +1,1169 @@
+// ═══════════════════════════════════════════════════════════
+// commandes.js — Onglet Commandes (groupées par client)
+// Dépend de : pcData, PDP_CORRESPONDANCES, nomenclatures, showToast (définis ailleurs)
+// ═══════════════════════════════════════════════════════════
+
+let cdeSelectedClient = null;
+let cdeGlobalMode = 'clients'; // 'clients' | 'chrono' | 'devis'
+let cdeChronoSearch = '';
+let _cdeChronoSearchTimer = null;
+let cdeDevisLines = [];      // {id, ref: correspondance|null, refText, qty}
+let _cdeDevisNextId = 1;
+let cdeDevisClient = '';     // code client (zones dédiées), optionnel
+
+// Palette pour diversifier visuellement les clients finaux RTD (Chaoran, Dental
+// Cube, etc.) — contrairement aux clients OEM (3M, APOL...) qui ont chacun une
+// couleur de marque dédiée dans PDP_CLIENT_COLORS, les clients finaux RTD sont
+// nombreux et variables (dépendants des commandes importées), donc on leur
+// attribue une couleur par hash déterministe du nom plutôt qu'une liste figée :
+// la même couleur revient toujours pour le même client, sans configuration à
+// maintenir à chaque nouveau client.
+const CDE_RTD_FINAL_PALETTE = [
+  {bg:'#E0F2FE', dot:'#0EA5E9', text:'#0C4A6E'}, // sky
+  {bg:'#EDE9FE', dot:'#7C3AED', text:'#4C1D95'}, // violet
+  {bg:'#FCE8F3', dot:'#C026D3', text:'#86198F'}, // fuchsia
+  {bg:'#FEF3C7', dot:'#D97706', text:'#92400E'}, // amber
+  {bg:'#D1FAE5', dot:'#059669', text:'#065F46'}, // emerald
+  {bg:'#FEE2E2', dot:'#DC2626', text:'#991B1B'}, // rouge
+  {bg:'#F0FDF4', dot:'#16A34A', text:'#14532D'}, // vert
+  {bg:'#E8F0FE', dot:'#4C8EDA', text:'#185FA5'}, // bleu
+  {bg:'#FFF4E6', dot:'#F59E0B', text:'#92400E'}, // orange
+  {bg:'#F0FFFE', dot:'#0891B2', text:'#164E63'}, // cyan
+  {bg:'#FDF2F8', dot:'#DB2777', text:'#831843'}, // rose
+  {bg:'#F7FEE7', dot:'#65A30D', text:'#365314'}, // lime
+];
+function cdeColorForFinalClient(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return CDE_RTD_FINAL_PALETTE[h % CDE_RTD_FINAL_PALETTE.length];
+}
+
+function cdeSetGlobalMode(mode) {
+  cdeGlobalMode = mode;
+  cdeSelectedClient = null;
+  cdeSelectedFinalClient = null;
+  renderCommandesPage();
+}
+
+function cdeChronoSetSearch(val) {
+  cdeChronoSearch = val;
+  clearTimeout(_cdeChronoSearchTimer);
+  _cdeChronoSearchTimer = setTimeout(() => {
+    renderCommandesPage();
+    const inp = document.getElementById('cde-chrono-search');
+    if (inp) { inp.focus(); inp.value = val; }
+  }, 200);
+}
+
+// Toutes les lignes de commandes ouvertes (restant > 0), tous clients confondus,
+// directement depuis les données brutes — même principe que pour la vue "client
+// final RTD" : ne dépend pas de PDP_CORRESPONDANCES pour la visibilité (juste
+// pour enrichir le libellé quand la référence est suivie).
+function cdeGetAllOpenLines() {
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances()
+    : (typeof PDP_CORRESPONDANCES !== 'undefined' ? PDP_CORRESPONDANCES : []);
+  const corrByCode = {};
+  corrs.forEach(r => { corrByCode[r.code_client] = r; });
+  // Dédupliquer par ligne de commande (NUM_COM+LIGNE_COM) : une même ligne de
+  // commande apparaît une fois par bon de livraison partiel dans l'export ERP,
+  // avec QTE_CDE/QTE_LIVREE identiques à chaque fois (ce sont des totaux de
+  // LIGNE, pas des quantités par BL — voir le même constat fait sur
+  // QTE_LIVREE/QTE_LIVRE2 dans conso.js). Sans dédup, une ligne livrée en 2 BL
+  // apparaît 2 fois à l'identique dans le tableau.
+  const seen = new Set();
+  const dedupedRows = (pcData.commandes||[]).filter(c => {
+    const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return dedupedRows.map(c => {
+    const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
+    if (qteRest <= 0) return null;
+    if (String(c.COMMANDE_S||'').trim() === 'O') return null; // "Soldée" côté ERP : à ignorer même si un restant apparaît
+    const code = String(c.REF_RTD||'').trim();
+    const corr = corrByCode[code];
+    return {
+      numCmd: String(c.NUM_COM||''),
+      client: String(c.LIBFOU||c.CODCLI||'').trim() || 'Client non renseigné',
+      ref: code,
+      libelle: corr ? corr.libelle_fg : (String(c.LIBELL||'').trim() || code),
+      codart_wip: corr ? corr.codart_wip : null,
+      code_client: corr ? corr.code_client : code,
+      qteCde: Number(c.QTE_CDE)||0,
+      qteLiv: Number(c.QTE_LIVREE)||0,
+      qteRest,
+      datDel: cdeToISODate(c.DATDEL),
+    };
+  }).filter(Boolean);
+}
+
+let cdeSelectedFinalClient = null; // niveau intermédiaire, uniquement pour RTD
+let cdeSearchFilter = '';
+let _cdeSearchTimer = null;
+let _cdeCurrentRows = []; // lignes du tableau actuellement affiché, pour cdeShowOrderDetail()
+
+// Résout une référence WIP vers son code FG final via la nomenclature.
+// IMPORTANT : passer code_client quand on l'a (il vient de PDP_CORRESPONDANCES et
+// est déjà le bon code FG, fiable à 100%) — ne pas se reposer sur la nomenclature
+// seule, qui ne permet pas de distinguer deux références partageant un même WIP
+// (ex: standard vs variante L27) et dont le repli par ratio pouvait renvoyer le
+// tenon de départ au lieu du FG pour une chaîne à ratios tous vides (ex: AXIS).
+function cdeResolveToFG(ref, code_client) {
+  if (code_client) return code_client;
+  if (typeof nomenclatures === 'undefined') return ref;
+  const nom = (typeof findNomenclatureByCodart === 'function') ? findNomenclatureByCodart(ref) : null;
+  if (!nom) return ref;
+  // Dernière étape à ratio nul = le FG terminal, pas la première (voir commentaire ci-dessus)
+  const fgEtape = nom.etapes.slice().reverse().find(e => e.ratio === null);
+  return fgEtape ? fgEtape.codart : ref;
+}
+
+// Toutes les commandes ouvertes (restant à livrer > 0, filtré plus bas) pour un
+// code FG donné. IMPORTANT : ne PAS filtrer sur LIGNE_CDE_='N' — ce champ ne veut
+// pas dire "ouverte/fermée" (constaté sur le fichier réel : des lignes 'O' ont
+// encore un restant non nul, et 'N' semble plutôt indiquer "aucune livraison
+// encore enregistrée"). Le champ fiable pour "ouverte" est QTE_CDE > QTE_LIVREE,
+// ET COMMANDE_S !== 'O' (constaté le 15/07/2026 sur une commande ERP marquée
+// "Soldée : Oui" avec un restant non nul — COMMANDE_S semble correspondre à ce
+// vrai statut "Soldée" de l'ERP, contrairement à LIGNE_CDE_).
+function cdeGetForRef(fgCode) {
+  // Même dédup que cdeGetAllOpenLines (voir commentaire là-bas) : une ligne
+  // livrée en plusieurs BL partiels ne doit compter qu'une fois.
+  const seen = new Set();
+  const dedupedRows = (pcData.commandes||[]).filter(c => {
+    const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return dedupedRows
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
+    .map(r => ({
+      numCmd:  String(r.NUM_COM||''),
+      client:  String(r.LIBFOU||r.CODCLI||''),
+      codcli:  String(r.CODCLI||'').trim(), // code client exact (ex: "CCH1228") — plus fiable que le nom affiché pour identifier une zone de stock dédiée
+      ref:     fgCode,
+      qteCde:  Number(r.QTE_CDE)||0,
+      qteLiv:  Number(r.QTE_LIVREE)||0,
+      qteRest: (Number(r.QTE_CDE)||0) - (Number(r.QTE_LIVREE)||0),
+      datDem:  cdeToISODate(r.DATDEM),
+      datDel:  cdeToISODate(r.DATDEL),
+    }))
+    .filter(r => r.qteRest > 0);
+}
+
+// Convertit une valeur date (string ISO, objet Date, ou format FR) en "YYYY-MM-DD"
+function cdeToISODate(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    // "Truc du midi" : ni les getters locaux ni les getters UTC seuls ne sont
+    // fiables ici, car selon la version de SheetJS et le contexte d'exécution,
+    // cellDates:true construit la date Excel tantôt à minuit LOCAL, tantôt à
+    // minuit UTC — un signalement le 12/08/2026 a justifié le passage aux
+    // getters locaux, un autre le 18/08/2026 (commande 16301 : 01/09 dans
+    // Excel, affiché 31/08 dans l'appli) montre que ce n'était pas suffisant
+    // (probablement un mélange des deux selon le champ/l'import). On décale
+    // donc l'instant de +12h avant de lire en UTC : que la construction
+    // d'origine soit minuit local ou minuit UTC, ce décalage retombe toujours
+    // au milieu de la bonne journée civile (les fuseaux concernés ici, France
+    // incluse, ont un décalage largement inférieur à 12h), donc le résultat
+    // est correct indépendamment de l'interprétation de départ.
+    const noon = new Date(val.getTime() + 12*60*60*1000);
+    const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+  const s = String(val).trim();
+  // Chaîne ISO avec horodatage (ex: "2026-08-31T21:59:39.000Z") — typiquement
+  // une valeur qui a déjà traversé un JSON.stringify() sur un objet Date (qui
+  // sérialise automatiquement en UTC). Un simple découpage des 10 premiers
+  // caractères prend alors le jour UTC brut, potentiellement décalé d'un jour
+  // par rapport au jour civil réel voulu (constaté le 18/08/2026 sur la
+  // commande 16301 : stockée "2026-08-31T21:59:39.000Z", jour réel 01/09).
+  // On applique donc le même "truc du midi" que pour les objets Date : décaler
+  // de +12h avant de lire en UTC retombe sur le bon jour quelle que soit
+  // l'origine du décalage (fuseau ou arrondi de l'export ERP).
+  const isoDateTime = s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  if (isoDateTime) {
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const noon = new Date(dt.getTime() + 12*60*60*1000);
+      const y = noon.getUTCFullYear(), m = String(noon.getUTCMonth()+1).padStart(2,'0'), d = String(noon.getUTCDate()).padStart(2,'0');
+      return y+'-'+m+'-'+d;
+    }
+  }
+  // Chaîne déjà au format YYYY-MM-DD pur (sans horodatage) : sans ambiguïté,
+  // on la prend telle quelle.
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return isoMatch[1]+'-'+isoMatch[2]+'-'+isoMatch[3];
+  const frMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (frMatch) return frMatch[3]+'-'+frMatch[2].padStart(2,'0')+'-'+frMatch[1].padStart(2,'0');
+  return null;
+}
+
+function cdeFmtDate(iso) {
+  if (!iso) return '\u2014';
+  const [y,m,d] = iso.split('-');
+  return d+'/'+m+'/'+y.slice(2);
+}
+
+// ── Clic délégué
+document.addEventListener('click', function(e) {
+  const action = e.target.closest('[data-cde-action]');
+  if (action) {
+    e.stopPropagation();
+    const act = action.getAttribute('data-cde-action');
+    const arg = action.getAttribute('data-cde-arg');
+    if (act === 'select-client') {
+      cdeSelectedClient = arg || null;
+      cdeSelectedFinalClient = null;
+      cdeSearchFilter = '';
+      renderCommandesPage();
+    } else if (act === 'select-final-client') {
+      cdeSelectedFinalClient = arg || null;
+      cdeSearchFilter = '';
+      renderCommandesPage();
+    } else if (act === 'select-rtd-final-client') {
+      // Raccourci depuis la vue d'ensemble : ouvre directement le détail d'un
+      // client final RTD sans passer par l'étape intermédiaire "carte RTD".
+      cdeSelectedClient = 'RTD';
+      cdeSelectedFinalClient = arg || null;
+      cdeSearchFilter = '';
+      renderCommandesPage();
+    } else if (act === 'back-to-final-clients') {
+      cdeSelectedFinalClient = null;
+      cdeSearchFilter = '';
+      renderCommandesPage();
+    } else if (act === 'show-order') {
+      cdeShowOrderDetail(arg);
+    }
+    return;
+  }
+});
+
+// Ouvre directement le détail d'une commande depuis un autre onglet (ex: tuile
+// PDP) sans passer par le rendu de la page Commandes au préalable — peuple le
+// cache _cdeCurrentRows avec toutes les lignes ouvertes (même source que le mode
+// chrono, cdeGetAllOpenLines) puis délègue à cdeShowOrderDetail. La modale étant
+// autonome, il n'est pas nécessaire de changer d'onglet.
+function cdeGotoOrder(numCmd) {
+  _cdeCurrentRows = cdeGetAllOpenLines();
+  cdeShowOrderDetail(numCmd);
+}
+
+function cdeSearch(val) {
+  cdeSearchFilter = val;
+  clearTimeout(_cdeSearchTimer);
+  _cdeSearchTimer = setTimeout(() => {
+    renderCommandesPage();
+    const inp = document.getElementById('cde-search-input');
+    if (inp) { inp.focus(); inp.value = val; }
+  }, 200);
+}
+
+// Ouvre une modale avec le détail ligne-à-ligne d'une commande, et le stock
+// disponible en face de chaque référence (via pdpGetTotalFGForRef, pdp.js).
+function cdeShowOrderDetail(numCmd) {
+  const lines = _cdeCurrentRows.filter(r => r.numCmd === numCmd);
+  if (!lines.length) return;
+  const client = lines[0].client;
+
+  const rowsHtml = lines.map((r, idx) => {
+    const zones = (typeof pdpGetZonesForClient === 'function') ? pdpGetZonesForClient(r.codcli) : null;
+    const breakdown = (typeof pdpGetLevelsBreakdown === 'function')
+      ? pdpGetLevelsBreakdown(r.codart_wip, r.code_client, zones)
+      : null;
+    const stock = breakdown ? breakdown.totalFG : null;
+    const ok = stock !== null && stock >= r.qteRest;
+
+    // Encadré détaillé au survol : un vrai bloc HTML (pas la bulle native du
+    // navigateur), regroupé en 3 catégories lisibles — tenons, blisters, FG — en
+    // quantités BRUTES disponibles (pas l'équivalent FG, qui est déjà le total
+    // affiché sur le badge). Les étapes avant le blister (tenon brut, tenon
+    // jointé...) sont cumulées sur une seule ligne "Tenons".
+    const tooltipId = 'cde-lv-' + numCmd.replace(/[^a-zA-Z0-9]/g,'') + '-' + idx;
+    let tooltipHtml = '';
+    if (breakdown) {
+      const { levels, blisterIdx, totalFG } = breakdown;
+      const hasBlisterLevel = levels.length > 1 && blisterIdx >= 0 && blisterIdx < levels.length - 1;
+      const tenons   = levels.filter((l,i) => i < blisterIdx).reduce((s,l) => s + l.stk, 0);
+      const blisters = hasBlisterLevel ? levels.filter((l,i) => i === blisterIdx).reduce((s,l) => s + l.stk, 0) : 0;
+      const fg       = levels.filter((l,i) => hasBlisterLevel ? i > blisterIdx : i >= blisterIdx).reduce((s,l) => s + l.stk, 0);
+
+      const zoneTagBlister = zones ? ' <span style="color:var(--text-faint);font-weight:400">('+zones.blister.join('+')+')</span>' : '';
+      const zoneTagFG = zones ? ' <span style="color:var(--text-faint);font-weight:400">('+zones.fg.join('+')+')</span>' : '';
+
+      const ligne = (label, valeur, tag) =>
+        '<div style="display:flex;justify-content:space-between;gap:16px;padding:4px 0;font-size:12px">'
+        + '<span>'+label+(tag||'')+'</span>'
+        + '<span style="font-weight:600;white-space:nowrap">'+valeur.toLocaleString('fr')+'</span>'
+        + '</div>';
+
+      tooltipHtml = '<div id="'+tooltipId+'" style="display:none;position:absolute;right:0;top:100%;z-index:80;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);box-shadow:0 10px 34px rgba(0,0,0,.22);padding:12px 14px;min-width:230px;text-align:left;margin-top:6px">'
+        + '<div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">Stock disponible par niveau</div>'
+        + ligne('Tenons', tenons, '')
+        + (hasBlisterLevel ? ligne('Blisters', blisters, zoneTagBlister) : '')
+        + ligne('FG', fg, zoneTagFG)
+        + '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:700">'
+        + '<span>Total (équiv. FG)</span><span>'+totalFG.toLocaleString('fr')+'</span>'
+        + '</div></div>';
+    }
+
+    const stockBadge = (stock === null || !r.codart_wip)
+      ? '<span style="font-size:11px;color:var(--text-faint)" title="Référence non suivie dans les correspondances (pas de nomenclature) — stock inconnu">— non suivi</span>'
+      : '<span onmouseenter="var t=document.getElementById(\''+tooltipId+'\');if(t)t.style.display=\'block\'" onmouseleave="var t=document.getElementById(\''+tooltipId+'\');if(t)t.style.display=\'none\'"'
+        + ' style="position:relative;display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+';cursor:help">'
+        + '<i class="ti '+(ok?'ti-check':'ti-x')+'" style="vertical-align:-1px;margin-right:3px;font-size:10px"></i>'+stock.toLocaleString('fr')
+        + (zones?' <i class="ti ti-map-pin" style="font-size:9px;vertical-align:1px;opacity:.6"></i>':'')
+        + tooltipHtml
+        + '</span>';
+    return '<tr onclick="'+(typeof pdpShowDetail==='function'?'closeOverlay();pdpShowDetail(\''+r.code_client+'\')':'')+'" style="cursor:'+(typeof pdpShowDetail==='function'&&r.codart_wip?'pointer':'default')+'">'
+      + '<td style="font-size:12px">'+r.libelle+(r.codart_wip?'<div style="font-size:9px;color:var(--text-faint);font-family:monospace">'+r.codart_wip+'</div>':'')+'</td>'
+      + '<td style="text-align:right;font-size:12px">'+r.qteCde.toLocaleString('fr')+'</td>'
+      + '<td style="text-align:right;font-size:12px;color:var(--text-muted)">'+r.qteLiv.toLocaleString('fr')+'</td>'
+      + '<td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">'+r.qteRest.toLocaleString('fr')+'</span></td>'
+      + '<td style="text-align:right">'+stockBadge+'</td>'
+      + '<td style="font-size:11px;color:var(--text-muted)">'+cdeFmtDate(r.datDel)+'</td>'
+      + '</tr>';
+  }).join('');
+
+  const totalRestant = lines.reduce((s,r)=>s+r.qteRest,0);
+
+  const modalEl = document.getElementById('modal');
+  modalEl.style.width = '900px'; // plus large que le défaut (580px) pour éviter le scroll horizontal du tableau ; CSS .modal garde max-width:95vw pour les petits écrans
+  modalEl.innerHTML = `
+    <div class="modal-header">
+      <h2><i class="ti ti-shopping-cart" style="color:var(--accent);margin-right:8px"></i>Commande ${numCmd}
+        <span style="font-size:12px;font-weight:500;margin-left:10px;padding:3px 10px;border-radius:20px;background:var(--bg);color:var(--text-muted)">${client}</span>
+      </h2>
+      <button class="close-btn" onclick="closeOverlay()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <div style="background:var(--bg);border-radius:var(--radius);padding:10px 14px;flex:1">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Lignes</div>
+          <div style="font-size:18px;font-weight:700">${lines.length}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:var(--radius);padding:10px 14px;flex:1">
+          <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Total restant</div>
+          <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalRestant.toLocaleString('fr')}</div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+        <table class="cat-table" style="width:100%;table-layout:fixed">
+          <colgroup>
+            <col style="width:34%"><col style="width:11%"><col style="width:11%">
+            <col style="width:13%"><col style="width:16%"><col style="width:15%">
+          </colgroup>
+          <thead><tr><th>Référence</th><th style="text-align:right">Cdé</th><th style="text-align:right">Livré</th>
+          <th style="text-align:right">Restant</th><th style="text-align:right">Stock dispo.</th><th>Livraison</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="font-size:10px;color:var(--text-faint);margin-top:8px">Cliquer sur une ligne ouvre le détail de la référence dans le PDP.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeOverlay()">Fermer</button>
+    </div>`;
+  document.getElementById('overlay').classList.add('open');
+}
+
+
+// ── Calculateur de commande ─────────────────────────────────────────────────
+// Simule la disponibilité de stock pour UN client donné (avec sa zone dédiée
+// appliquée si configurée — voir CLIENT_STOCK_ZONES, index.html) et une quantité
+// demandée. Rendu ciblé (pas de renderCommandesPage() complet à chaque saisie)
+// pour ne pas perdre le focus des champs pendant la frappe.
+let cdeCalcSelectedRef = null; // {codart_wip, code_client, libelle_fg, client}
+let _cdeCalcSearchTimer = null;
+
+function cdeCalcRenderSection() {
+  const zonesConfig = (typeof CLIENT_STOCK_ZONES !== 'undefined') ? CLIENT_STOCK_ZONES : {};
+  const clientLabels = { 'CCH1228': 'Chaoran (CCH1228)', 'ICE1103': 'DS DNA (ICE1103)' };
+  const clientOptions = '<option value="">Client standard (stock général)</option>'
+    + Object.keys(zonesConfig).map(code =>
+        '<option value="'+code+'">'+(clientLabels[code]||code)+'</option>'
+      ).join('');
+
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">'
+    + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:12px"><i class="ti ti-calculator" style="vertical-align:-2px;margin-right:6px"></i>Calculateur de commande</div>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'
+    + '<div style="flex:2;min-width:200px;position:relative">'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Référence produit</div>'
+    + '<input id="cde-calc-ref" placeholder="ex: W41, DT Illusion…" oninput="cdeCalcRefChanged()" onfocus="cdeCalcRefChanged()" onblur="setTimeout(cdeCalcHideSuggestions,150)" autocomplete="off"'
+    + ' style="width:100%;padding:8px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + '<div id="cde-calc-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:3px"></div>'
+    + '</div>'
+    + '<div style="flex:1.4;min-width:190px">'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Client</div>'
+    + '<select id="cde-calc-client" onchange="cdeCalc()" style="width:100%;padding:8px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + clientOptions
+    + '</select>'
+    + '</div>'
+    + '<div style="flex:1;min-width:130px">'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Quantité demandée</div>'
+    + '<input id="cde-calc-qty" type="number" min="1" placeholder="ex: 10000" oninput="cdeCalc()"'
+    + ' style="width:100%;padding:8px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + '</div>'
+    + '</div>'
+    + '<div id="cde-calc-result" style="margin-top:14px"></div>'
+    + '</div>';
+}
+
+function cdeCalcRefChanged() {
+  clearTimeout(_cdeCalcSearchTimer);
+  const inp = document.getElementById('cde-calc-ref');
+  const val = (inp?.value || '').trim().toLowerCase();
+  const result = document.getElementById('cde-calc-result');
+  if (result) result.innerHTML = '';
+  const box = document.getElementById('cde-calc-suggestions');
+  if (!box) return;
+  if (!val) { box.style.display = 'none'; return; }
+
+  _cdeCalcSearchTimer = setTimeout(() => {
+    const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+    const matches = corrs.filter(r =>
+      r.libelle_fg.toLowerCase().includes(val) ||
+      r.codart_wip.toLowerCase().includes(val) ||
+      r.code_client.toLowerCase().includes(val)
+    ).slice(0, 8);
+
+    if (!matches.length) { box.style.display = 'none'; return; }
+
+    box.innerHTML = matches.map(r =>
+      '<div onmousedown="cdeCalcPickSuggestion(\''+r.code_client.replace(/'/g,"\\'")+'\')" '
+      + 'style="padding:7px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" '
+      + 'onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'\'">'
+      + '<div style="font-weight:600">'+r.libelle_fg+'</div>'
+      + '<div style="font-size:10px;color:var(--text-faint)">'+r.client+' · '+r.codart_wip+'</div>'
+      + '</div>'
+    ).join('');
+    box.style.display = 'block';
+  }, 150);
+}
+
+function cdeCalcHideSuggestions() {
+  const box = document.getElementById('cde-calc-suggestions');
+  if (box) box.style.display = 'none';
+}
+
+function cdeCalcPickSuggestion(codeClient) {
+  cdeCalcHideSuggestions();
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+  const ref = corrs.find(r => r.code_client === codeClient);
+  if (!ref) return;
+  cdeCalcSelectedRef = ref;
+  const inp = document.getElementById('cde-calc-ref');
+  if (inp) inp.value = ref.libelle_fg;
+  cdeCalc();
+}
+
+function cdeCalc() {
+  const result = document.getElementById('cde-calc-result');
+  if (!result) return;
+  if (!cdeCalcSelectedRef) { result.innerHTML = ''; return; }
+
+  const qty = parseInt(document.getElementById('cde-calc-qty')?.value) || 0;
+  const clientCode = document.getElementById('cde-calc-client')?.value || '';
+  const zones = (clientCode && typeof pdpGetZonesForClient === 'function') ? pdpGetZonesForClient(clientCode) : null;
+
+  const breakdown = (typeof pdpGetLevelsBreakdown === 'function')
+    ? pdpGetLevelsBreakdown(cdeCalcSelectedRef.codart_wip, cdeCalcSelectedRef.code_client, zones)
+    : null;
+  if (!breakdown) { result.innerHTML = ''; return; }
+
+  const { levels, blisterIdx, totalFG } = breakdown;
+  const hasBlisterLevel = levels.length > 1 && blisterIdx >= 0 && blisterIdx < levels.length - 1;
+  const tenons   = levels.filter((l,i) => i < blisterIdx).reduce((s,l) => s + l.stk, 0);
+  const blisters = hasBlisterLevel ? levels.filter((l,i) => i === blisterIdx).reduce((s,l) => s + l.stk, 0) : 0;
+  const fg       = levels.filter((l,i) => hasBlisterLevel ? i > blisterIdx : i >= blisterIdx).reduce((s,l) => s + l.stk, 0);
+
+  let html = '<div style="background:var(--bg);border-radius:var(--radius);padding:12px 14px">'
+    + '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px;margin-bottom:'+(qty>0?'10px':'0')+'">'
+    + '<span>Tenons : <strong>'+tenons.toLocaleString('fr')+'</strong></span>'
+    + (hasBlisterLevel ? '<span>Blisters : <strong>'+blisters.toLocaleString('fr')+'</strong>'+(zones?' <span style="color:var(--text-faint)">('+zones.blister.join('+')+')</span>':'')+'</span>' : '')
+    + '<span>FG : <strong>'+fg.toLocaleString('fr')+'</strong>'+(zones?' <span style="color:var(--text-faint)">('+zones.fg.join('+')+')</span>':'')+'</span>'
+    + '<span>Total équiv. FG : <strong>'+totalFG.toLocaleString('fr')+'</strong></span>'
+    + '</div>';
+
+  if (qty > 0) {
+    const ok = totalFG >= qty;
+    html += '<div style="padding:10px 12px;border-radius:var(--radius);background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+';font-size:13px;font-weight:600">'
+      + '<i class="ti '+(ok?'ti-check':'ti-x')+'" style="vertical-align:-2px;margin-right:6px"></i>'
+      + (ok ? 'Servable sans production' : 'Production nécessaire — manque '+(qty-totalFG).toLocaleString('fr')+' pièces')
+      + '</div>';
+  }
+
+  html += '</div>';
+  result.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEVIS — étude de faisabilité multi-lignes (plusieurs références en une
+// fois, sans production/lead time estimé : juste stock dispo vs quantité
+// demandée par ligne). Outil de calcul ponctuel, non sauvegardé — les lignes
+// repartent à zéro à chaque rechargement de page (décision de Stéphane,
+// 22/07/2026).
+// ═══════════════════════════════════════════════════════════
+
+function cdeDevisAddLine() {
+  cdeDevisLines.push({id: _cdeDevisNextId++, ref: null, refText: '', qty: 0});
+  renderCommandesPage();
+}
+
+function cdeDevisRemoveLine(id) {
+  cdeDevisLines = cdeDevisLines.filter(l => l.id !== id);
+  if (!cdeDevisLines.length) cdeDevisLines.push({id: _cdeDevisNextId++, ref: null, refText: '', qty: 0});
+  renderCommandesPage();
+}
+
+function cdeDevisSetClient(val) {
+  cdeDevisClient = val;
+  renderCommandesPage();
+}
+
+function cdeDevisRefChanged(id) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line) return;
+  const inp = document.getElementById('devis-ref-'+id);
+  line.refText = (inp && inp.value) || '';
+  line.ref = null; // référence exacte inconnue tant qu'une suggestion n'est pas choisie
+  cdeDevisUpdateLineResult(id);
+
+  const box = document.getElementById('devis-suggestions-'+id);
+  if (!box) return;
+  const val = line.refText.trim().toLowerCase();
+  if (!val) { box.style.display = 'none'; return; }
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+  const matches = corrs.filter(r =>
+    r.libelle_fg.toLowerCase().includes(val) ||
+    r.codart_wip.toLowerCase().includes(val) ||
+    r.code_client.toLowerCase().includes(val)
+  ).slice(0, 8);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(r =>
+    '<div onmousedown="cdeDevisPickSuggestion('+id+',\''+r.code_client.replace(/'/g,"\\'")+'\')" '
+    + 'style="padding:7px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" '
+    + 'onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'\'">'
+    + '<div style="font-weight:600">'+r.libelle_fg+'</div>'
+    + '<div style="font-size:10px;color:var(--text-faint)">'+r.client+' · '+r.codart_wip+'</div>'
+    + '</div>'
+  ).join('');
+  box.style.display = 'block';
+}
+
+function cdeDevisHideSuggestions(id) {
+  const box = document.getElementById('devis-suggestions-'+id);
+  if (box) box.style.display = 'none';
+}
+
+function cdeDevisPickSuggestion(id, codeClient) {
+  cdeDevisHideSuggestions(id);
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line) return;
+  const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+  const ref = corrs.find(r => r.code_client === codeClient);
+  if (!ref) return;
+  line.ref = ref;
+  line.refText = ref.libelle_fg;
+  const inp = document.getElementById('devis-ref-'+id);
+  if (inp) inp.value = ref.libelle_fg;
+  cdeDevisUpdateLineResult(id);
+}
+
+function cdeDevisQtyChanged(id, val) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line) return;
+  line.qty = parseInt(val) || 0;
+  cdeDevisUpdateLineResult(id);
+}
+
+// Calcule stock dispo / manque pour une ligne (sans estimation de délai —
+// juste le manque en quantité, décision de Stéphane).
+function cdeDevisComputeLine(line) {
+  if (!line.ref) return null;
+  const zones = (cdeDevisClient && typeof pdpGetZonesForClient === 'function') ? pdpGetZonesForClient(cdeDevisClient) : null;
+  const totalFG = (typeof pdpGetTotalFGForRef === 'function') ? pdpGetTotalFGForRef(line.ref.codart_wip, line.ref.code_client) : 0;
+  const totalFGZoned = zones && typeof pdpGetTotalFGForRefZoned === 'function'
+    ? pdpGetTotalFGForRefZoned(line.ref.codart_wip, line.ref.code_client, zones)
+    : totalFG;
+  const stock = zones ? totalFGZoned : totalFG;
+  const ok = line.qty > 0 ? stock >= line.qty : null; // null = pas encore de quantité saisie
+  return { stock, ok, manque: ok === false ? line.qty - stock : 0 };
+}
+
+function cdeDevisShowLineDetail(id) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  if (!line || !line.ref) return;
+  if (typeof pdpShowDetail === 'function') pdpShowDetail(line.ref.code_client);
+}
+
+function cdeDevisResultCellHtml(line) {
+  const res = cdeDevisComputeLine(line);
+  if (!line.ref) return '<span style="font-size:11px;color:var(--text-faint)">Choisir une référence…</span>';
+  if (res.ok === null) return '<span style="font-size:12px;color:var(--text-muted)">Stock dispo : <strong>'+res.stock.toLocaleString('fr')+'</strong></span>';
+  return '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+(res.ok?'#EAF3DE':'#FCEBEB')+';color:'+(res.ok?'#27500A':'#A32D2D')+'">'
+    + '<i class="ti '+(res.ok?'ti-check':'ti-x')+'" style="vertical-align:-2px;margin-right:4px"></i>'
+    + (res.ok ? 'OK ('+res.stock.toLocaleString('fr')+' dispo)' : 'Manque '+res.manque.toLocaleString('fr'))
+    + '</span>';
+}
+
+function cdeDevisUpdateLineResult(id) {
+  const line = cdeDevisLines.find(l => l.id === id);
+  const cell = document.getElementById('devis-result-'+id);
+  if (line && cell) {
+    cell.innerHTML = cdeDevisResultCellHtml(line);
+    cell.style.cursor = line.ref ? 'pointer' : '';
+  }
+  cdeDevisUpdateSummary();
+}
+
+function cdeDevisSummaryHtml() {
+  const withRef = cdeDevisLines.filter(l => l.ref && l.qty > 0);
+  if (!withRef.length) return '<span style="font-size:12px;color:var(--text-faint)">Ajoute des lignes pour étudier la faisabilité de la demande</span>';
+  const nbOk = withRef.filter(l => cdeDevisComputeLine(l).ok).length;
+  const nbKo = withRef.length - nbOk;
+  return '<span style="font-size:13px;font-weight:600">'
+    + '<span style="color:#27500A">'+nbOk+' réalisable'+(nbOk>1?'s':'')+' sans production</span>'
+    + (nbKo ? ' · <span style="color:#A32D2D">'+nbKo+' en manque</span>' : '')
+    + (nbOk===withRef.length && withRef.length>0 ? ' <i class="ti ti-circle-check" style="color:#27500A;vertical-align:-2px;margin-left:4px"></i> Devis entièrement servable' : '')
+    + '</span>';
+}
+
+function cdeDevisUpdateSummary() {
+  const bar = document.getElementById('devis-summary');
+  if (bar) bar.innerHTML = cdeDevisSummaryHtml();
+}
+
+// Import Excel pour le devis : remplace les lignes actuelles par le contenu du
+// fichier (colonne A = référence, colonne B = quantité — 1ère ligne traitée
+// comme un en-tête et ignorée). Chaque référence est recherchée automatiquement
+// dans les correspondances (même logique floue que l'autocomplétion : libellé,
+// codart_wip ou code_client) ; si aucune correspondance fiable n'est trouvée,
+// la ligne est quand même créée avec le texte brut pour que Stéphane la
+// complète à la main plutôt que de la perdre silencieusement.
+function cdeDevisImportFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const doImport = () => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const corrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances() : [];
+
+        // Colonnes candidates par nom d'en-tête, insensible à la casse — couvre
+        // à la fois les exports ERP bruts (CODART/QUANTI, ex: extraction Louxor
+        // DIYETAT) et des fichiers plus simples faits à la main (Référence/Qté).
+        const REF_HEADERS = ['codart','ref_rtd','référence','reference','code','codearticle',"code article"];
+        const QTY_HEADERS = ['quanti','qte','qte_cde','quantité','quantite','qty','quantitedemandee','quantité demandée'];
+
+        const headerRow = XLSX.utils.sheet_to_json(ws, {header:1, range:0, defval:null})[0] || [];
+        const normalize = h => String(h||'').trim().toLowerCase().replace(/\s+/g,'');
+        const refColIdx = headerRow.findIndex(h => REF_HEADERS.includes(normalize(h)));
+        const qtyColIdx = headerRow.findIndex(h => QTY_HEADERS.includes(normalize(h)));
+        const hasRecognizedHeaders = refColIdx !== -1 && qtyColIdx !== -1;
+
+        // Avec en-têtes reconnus : on saute la ligne d'en-tête (range:1) et on lit
+        // par index de colonne trouvé. Sans en-tête reconnu : ancien format simple
+        // colonne A = référence, colonne B = quantité (range:1 aussi, on suppose
+        // une ligne d'en-tête même non reconnue plutôt que de la lire comme donnée).
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, range:1, defval:null});
+        const useRefIdx = hasRecognizedHeaders ? refColIdx : 0;
+        const useQtyIdx = hasRecognizedHeaders ? qtyColIdx : 1;
+
+        const newLines = [];
+        let nbMatches = 0, nbSansMatch = 0;
+
+        rows.forEach(r => {
+          const refText = String(r[useRefIdx]||'').trim();
+          if (!refText) return;
+          const qty = parseInt(r[useQtyIdx]) || 0;
+          const val = refText.toLowerCase();
+
+          // Correspondance exacte d'abord (code_client ou codart_wip), sinon
+          // recherche floue sur le libellé — comme l'autocomplétion manuelle.
+          let ref = corrs.find(c => c.code_client.toLowerCase()===val || c.codart_wip.toLowerCase()===val)
+            || corrs.find(c => c.libelle_fg.toLowerCase().includes(val) || val.includes(c.libelle_fg.toLowerCase()));
+
+          if (ref) nbMatches++; else nbSansMatch++;
+          newLines.push({ id: _cdeDevisNextId++, ref: ref||null, refText: ref?ref.libelle_fg:refText, qty });
+        });
+
+        if (!newLines.length) { if (typeof showToast==='function') showToast('Aucune ligne exploitable trouvée. Colonnes attendues : CODART/Référence + QUANTI/Quantité (ou à défaut colonne A + colonne B).'); return; }
+
+        cdeDevisLines = newLines;
+        const formatMsg = hasRecognizedHeaders ? ` (colonnes "${headerRow[refColIdx]}"/"${headerRow[qtyColIdx]}" détectées)` : '';
+        if (typeof showToast === 'function') showToast(`Devis importé${formatMsg} : ${newLines.length} ligne(s), ${nbMatches} référence(s) reconnue(s)${nbSansMatch?', '+nbSansMatch+' à choisir manuellement':''}.`);
+        renderCommandesPage();
+      } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast('Erreur import devis : ' + err.message);
+      }
+    };
+    if (typeof loadXLSXForPdp === 'function') loadXLSXForPdp(doImport);
+    else if (typeof XLSX !== 'undefined') doImport();
+    else console.error('XLSX non disponible et loadXLSXForPdp introuvable');
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = ''; // permet de réimporter le même fichier deux fois de suite si besoin
+}
+
+function cdeDevisRenderSection() {
+  if (!cdeDevisLines.length) cdeDevisLines.push({id: _cdeDevisNextId++, ref: null, refText: '', qty: 0});
+
+  const zonesConfig = (typeof CLIENT_STOCK_ZONES !== 'undefined') ? CLIENT_STOCK_ZONES : {};
+  const clientLabels = { 'CCH1228': 'Chaoran (CCH1228)', 'ICE1103': 'DS DNA (ICE1103)' };
+  const clientOptions = '<option value="">Client standard (stock général)</option>'
+    + Object.keys(zonesConfig).map(code =>
+        '<option value="'+code+'" '+(cdeDevisClient===code?'selected':'')+'>'+(clientLabels[code]||code)+'</option>'
+      ).join('');
+
+  const rowsHtml = cdeDevisLines.map(line =>
+    '<tr>'
+    + '<td style="position:relative;min-width:240px">'
+    + '<input id="devis-ref-'+line.id+'" value="'+(line.refText||'').replace(/"/g,'&quot;')+'" placeholder="ex: W41, DT Illusion…" '
+    + 'oninput="cdeDevisRefChanged('+line.id+')" onfocus="cdeDevisRefChanged('+line.id+')" onblur="setTimeout(()=>cdeDevisHideSuggestions('+line.id+'),150)" autocomplete="off" '
+    + 'style="width:100%;padding:7px 9px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + '<div id="devis-suggestions-'+line.id+'" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--radius);max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:3px"></div>'
+    + '</td>'
+    + '<td style="width:130px">'
+    + '<input type="number" min="1" placeholder="Quantité" value="'+(line.qty||'')+'" oninput="cdeDevisQtyChanged('+line.id+',this.value)" '
+    + 'style="width:100%;padding:7px 9px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);outline:none">'
+    + '</td>'
+    + '<td id="devis-result-'+line.id+'" onclick="cdeDevisShowLineDetail('+line.id+')" title="Voir le détail du stock et des commandes" style="min-width:170px;'+(line.ref?'cursor:pointer':'')+'">'+cdeDevisResultCellHtml(line)+'</td>'
+    + '<td style="width:36px;text-align:center">'
+    + '<button onclick="cdeDevisRemoveLine('+line.id+')" title="Retirer cette ligne" style="background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:15px;padding:4px"><i class="ti ti-trash"></i></button>'
+    + '</td>'
+    + '</tr>'
+  ).join('');
+
+  return '<div style="flex:1;overflow-y:auto;padding:16px 20px">'
+    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px">'
+    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em"><i class="ti ti-file-text" style="vertical-align:-2px;margin-right:6px"></i>Devis — étude de faisabilité</div>'
+    + '<div style="margin-left:auto;min-width:220px">'
+    + '<select onchange="cdeDevisSetClient(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none">'
+    + clientOptions
+    + '</select>'
+    + '</div>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse">'
+    + '<thead><tr style="text-align:left">'
+    + '<th style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;padding-bottom:6px">Référence</th>'
+    + '<th style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;padding-bottom:6px">Quantité</th>'
+    + '<th style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;padding-bottom:6px">Faisabilité</th>'
+    + '<th></th>'
+    + '</tr></thead>'
+    + '<tbody>'+rowsHtml+'</tbody>'
+    + '</table>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+    + '<button onclick="cdeDevisAddLine()" class="btn" style="font-size:12px;padding:6px 12px"><i class="ti ti-plus"></i> Ajouter une ligne</button>'
+    + '<label class="btn" style="cursor:pointer;font-size:12px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-file-import"></i> Importer un fichier (référence, quantité)<input type="file" accept=".xls,.xlsx" style="display:none" onchange="cdeDevisImportFile(this)"></label>'
+    + '</div>'
+    + '<div id="devis-summary" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">'+cdeDevisSummaryHtml()+'</div>'
+    + '</div></div>';
+}
+
+
+// ── Rendu principal
+function renderCommandesPage() {
+  const el = document.getElementById('view-commandes');
+  if (!el) return;
+
+  const hasCommandes = (pcData.commandes||[]).length > 0;
+
+  // Regrouper les correspondances actives (imports/données persistées inclus,
+  // comme dans le PDP — voir pdpGetActiveCorrespondances) par client
+  const byClient = {};
+  const _activeCorrs = (typeof pdpGetActiveCorrespondances === 'function') ? pdpGetActiveCorrespondances()
+    : (typeof PDP_CORRESPONDANCES !== 'undefined' ? PDP_CORRESPONDANCES : []);
+  _activeCorrs.forEach(c => {
+    const key = c.client;
+    byClient[key] = byClient[key] || [];
+    byClient[key].push(c);
+  });
+  const clients = Object.keys(byClient).sort();
+
+  // Pour chaque client, calculer le total de commandes ouvertes et le nombre
+  function clientStats(cl) {
+    let totalQte = 0, totalCmds = 0, refsAvecCdes = 0;
+    byClient[cl].forEach(r => {
+      const fg = cdeResolveToFG(r.codart_wip, r.code_client);
+      const cmds = cdeGetForRef(fg);
+      if (cmds.length) refsAvecCdes++;
+      totalCmds += cmds.length;
+      totalQte += cmds.reduce((s,c) => s+c.qteRest, 0);
+    });
+    return { totalQte, totalCmds, refsAvecCdes };
+  }
+
+  // "RTD" dans les correspondances désigne les gammes propres de RTD (DT Illusion,
+  // Macro Ill XRO, etc.), vendues à de nombreux distributeurs différents — contrairement
+  // à 3M/APOL/etc. qui SONT eux-mêmes le client final. Regrouper tout sous une seule
+  // carte "RTD" masquerait qui achète réellement. On calcule donc, pour RTD uniquement,
+  // un niveau intermédiaire par client final réel (LIBFOU/CODCLI de la commande).
+  function cdeRTDFinalClientStats() {
+    const perFinal = {}; // finalClientName -> {refs:Set(code_client), totalQte, totalCmds}
+    (byClient['RTD']||[]).forEach(r => {
+      const fg = cdeResolveToFG(r.codart_wip, r.code_client);
+      cdeGetForRef(fg).forEach(c => {
+        const fc = c.client || 'Client non renseigné';
+        if (!perFinal[fc]) perFinal[fc] = { refs: new Set(), totalQte: 0, totalCmds: 0 };
+        perFinal[fc].refs.add(r.code_client);
+        perFinal[fc].totalQte += c.qteRest;
+        perFinal[fc].totalCmds += 1;
+      });
+    });
+    return perFinal;
+  }
+
+  const COL_DEFAULT = {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
+  const CLIENT_COLORS = (typeof PDP_CLIENT_COLORS !== 'undefined') ? PDP_CLIENT_COLORS : {};
+
+  let mainContent = '';
+  let breadcrumb = '';
+  const isRTD = cdeSelectedClient === 'RTD';
+
+  // ── Toggle de mode (haut de page) : clients ou chronologique ──────────────
+  const modeToggle = '<div style="display:flex;gap:6px;margin-left:12px">'
+    + '<button onclick="cdeSetGlobalMode(\'clients\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='clients'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='clients'?'#fff':'var(--text)')+'">Par client</button>'
+    + '<button onclick="cdeSetGlobalMode(\'chrono\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='chrono'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='chrono'?'#fff':'var(--text)')+'">Par date</button>'
+    + '<button onclick="cdeSetGlobalMode(\'devis\')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-med);cursor:pointer;background:'+(cdeGlobalMode==='devis'?'var(--accent)':'var(--surface)')+';color:'+(cdeGlobalMode==='devis'?'#fff':'var(--text)')+'"><i class="ti ti-file-text" style="vertical-align:-2px;margin-right:3px"></i>Devis</button>'
+    + '</div>';
+
+  if (cdeGlobalMode === 'devis') {
+    const html = '<div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">'
+      + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+      + '<h2 style="font-size:17px;font-weight:600">Commandes</h2>'
+      + modeToggle
+      + '</div>'
+      + cdeDevisRenderSection()
+      + '</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  if (cdeGlobalMode === 'chrono') {
+    let lines = cdeGetAllOpenLines();
+    const search = cdeChronoSearch.toLowerCase();
+    if (search) {
+      lines = lines.filter(l =>
+        l.libelle.toLowerCase().includes(search) ||
+        l.client.toLowerCase().includes(search) ||
+        l.numCmd.toLowerCase().includes(search) ||
+        l.ref.toLowerCase().includes(search)
+      );
+    }
+    lines.sort((a,b) => (a.datDel||'9999').localeCompare(b.datDel||'9999'));
+
+    // Rendre ces lignes disponibles à cdeShowOrderDetail (qui filtre par numCmd
+    // dans _cdeCurrentRows, quelle que soit la vue depuis laquelle on l'ouvre).
+    _cdeCurrentRows = lines;
+
+    // Regroupement par commande : une ligne par N° Cde, la date/le client pris
+    // sur sa première ligne (une commande n'a qu'un client et une date de
+    // livraison prévue, même si elle contient plusieurs références).
+    const byCmd = {};
+    const cmdOrder = [];
+    lines.forEach(l => {
+      if (!byCmd[l.numCmd]) { byCmd[l.numCmd] = []; cmdOrder.push(l.numCmd); }
+      byCmd[l.numCmd].push(l);
+    });
+
+    const totalRestant = lines.reduce((s,l) => s+l.qteRest, 0);
+    const today = new Date().toISOString().slice(0,10);
+
+    const rowsHtml = cmdOrder.length ? cmdOrder.map(numCmd => {
+      const grp = byCmd[numCmd];
+      const first = grp[0];
+      const restantCmd = grp.reduce((s,l) => s+l.qteRest, 0);
+      const isLate = first.datDel && first.datDel < today;
+      return `<tr onclick="cdeShowOrderDetail('${numCmd}')" style="cursor:pointer">
+        <td style="font-size:12px;font-weight:600;color:${isLate?'#A32D2D':'var(--text)'}">${first.datDel ? cdeFmtDate(first.datDel) : '—'}${isLate?' <i class="ti ti-alert-triangle" style="font-size:11px;vertical-align:-1px" title="Livraison dépassée"></i>':''}</td>
+        <td style="font-size:11px;font-weight:700;color:var(--accent)">${numCmd}</td>
+        <td style="font-size:12px">${first.client}</td>
+        <td style="text-align:right;font-size:12px">${grp.length}</td>
+        <td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">${restantCmd.toLocaleString('fr')}</span></td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-faint)">Aucune commande ouverte</td></tr>';
+
+    const html = '<div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">'
+      + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+      + '<h2 style="font-size:17px;font-weight:600">Commandes</h2>'
+      + modeToggle
+      + '<input id="cde-chrono-search" placeholder="Filtrer (référence, n° commande, client)…" value="'+cdeChronoSearch+'" oninput="cdeChronoSetSearch(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:260px">'
+      + '<span style="margin-left:auto;font-size:12px;color:var(--text-muted)">'+cmdOrder.length+' commande(s) · '+lines.length+' ligne(s) · <strong style="color:#A32D2D">'+totalRestant.toLocaleString('fr')+'</strong> pièces restantes</span>'
+      + '</div>'
+      + '<div style="flex:1;overflow-y:auto;padding:16px 20px">'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto">'
+      + '<table class="cat-table" style="width:100%"><thead><tr>'
+      + '<th>Livraison</th><th>N° Cde</th><th>Client</th><th style="text-align:right">Lignes</th><th style="text-align:right">Restant</th>'
+      + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></div></div>';
+
+    el.innerHTML = html;
+    return;
+  }
+
+  if (!cdeSelectedClient) {
+    // ── Calculateur de commande : simule le stock disponible pour un client donné,
+    // en tenant compte de sa zone dédiée s'il en a une (Chaoran, DS DNA...).
+    mainContent += cdeCalcRenderSection();
+
+    // ── Vue d'ensemble : clients OEM d'abord, puis tous les clients finaux RTD
+    // affichés directement (plus besoin de cliquer sur une carte "RTD" pour les
+    // voir) — les deux groupes sont visuellement séparés par un intertitre.
+    const oemClients = clients.filter(cl => cl !== 'RTD');
+    const sectionHeader = (label, count) =>
+      '<div style="display:flex;align-items:center;gap:10px;margin:22px 0 12px 0">'
+      + '<span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-faint);text-transform:uppercase">'+label+'</span>'
+      + (count!==undefined ? '<span style="font-size:10px;font-weight:700;background:var(--bg);color:var(--text-faint);padding:1px 7px;border-radius:20px;border:1px solid var(--border)">'+count+'</span>' : '')
+      + '<span style="flex:1;height:1px;background:var(--border)"></span>'
+      + '</div>';
+
+    if (oemClients.length) {
+      mainContent += sectionHeader('Clients OEM', oemClients.length);
+      mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
+      oemClients.forEach(cl => {
+        const col = CLIENT_COLORS[cl] || COL_DEFAULT;
+        const stats = clientStats(cl);
+        mainContent +=
+          '<div data-cde-action="select-client" data-cde-arg="'+cl+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+          +' onmouseenter="this.style.background=\''+col.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+          +'<span style="font-size:14px;font-weight:700;color:'+col.text+';flex:1">'+cl+'</span>'
+          +(stats.totalCmds>0?'<span style="font-size:10px;font-weight:700;background:'+col.dot+';color:#fff;padding:2px 8px;border-radius:20px">'+stats.totalCmds+'</span>':'')
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
+          +'<span>'+stats.refsAvecCdes+' réf. concernées</span>'
+          +'<span style="font-weight:700;color:'+(stats.totalQte>0?'#A32D2D':'var(--text-faint)')+'">'+stats.totalQte.toLocaleString('fr')+' pièces</span>'
+          +'</div></div>';
+      });
+      mainContent += '</div>';
+    }
+
+    if (clients.includes('RTD')) {
+      const perFinal = cdeRTDFinalClientStats();
+      const finalNames = Object.keys(perFinal).sort();
+      mainContent += sectionHeader('Clients RTD — par client final', finalNames.length);
+      if (finalNames.length) {
+        mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
+        finalNames.forEach(fc => {
+          const s = perFinal[fc];
+          const colFc = cdeColorForFinalClient(fc);
+          mainContent +=
+            '<div data-cde-action="select-rtd-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+colFc.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+            +' onmouseenter="this.style.background=\''+colFc.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+            +'<div style="font-size:13px;font-weight:700;color:'+colFc.text+';margin-bottom:10px">'+fc+'</div>'
+            +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
+            +'<span>'+s.refs.size+' réf.</span>'
+            +'<span style="font-weight:700;color:#A32D2D">'+s.totalQte.toLocaleString('fr')+' pièces</span>'
+            +'</div></div>';
+        });
+        mainContent += '</div>';
+      } else {
+        mainContent += '<div style="text-align:center;padding:30px;color:var(--text-faint)"><i class="ti ti-circle-check" style="font-size:24px;display:block;margin-bottom:6px;color:#27500A"></i>Aucune commande ouverte sur les références RTD</div>';
+      }
+    }
+
+    if (!hasCommandes) {
+      mainContent += '<div style="margin-top:14px;padding:12px 16px;background:var(--bg);border:1px dashed var(--border-med);border-radius:var(--radius);font-size:12px;color:var(--text-faint);text-align:center">'
+        +'<i class="ti ti-upload" style="font-size:20px;display:block;margin-bottom:6px"></i>'
+        +'Importez vos commandes depuis l\'onglet Stock pour voir le détail ici</div>';
+    }
+
+  } else if (isRTD && !cdeSelectedFinalClient) {
+    // ── Niveau intermédiaire RTD : une carte par client final réel ─────────
+    const perFinal = cdeRTDFinalClientStats();
+    const finalNames = Object.keys(perFinal).sort();
+
+    breadcrumb = '<span style="font-size:11px;color:var(--text-faint)">RTD <i class="ti ti-chevron-right" style="font-size:10px;vertical-align:-1px"></i> clients finaux</span>';
+
+    if (finalNames.length) {
+      mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">';
+      finalNames.forEach(fc => {
+        const s = perFinal[fc];
+        const colFc = cdeColorForFinalClient(fc);
+        mainContent +=
+          '<div data-cde-action="select-final-client" data-cde-arg="'+fc.replace(/"/g,'&quot;')+'" style="background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+colFc.dot+';border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .15s"'
+          +' onmouseenter="this.style.background=\''+colFc.bg+'\'" onmouseleave="this.style.background=\'var(--surface)\'">'
+          +'<div style="font-size:13px;font-weight:700;color:'+colFc.text+';margin-bottom:10px">'+fc+'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">'
+          +'<span>'+s.refs.size+' réf.</span>'
+          +'<span style="font-weight:700;color:#A32D2D">'+s.totalQte.toLocaleString('fr')+' pièces</span>'
+          +'</div></div>';
+      });
+      mainContent += '</div>';
+    } else {
+      mainContent += '<div style="text-align:center;padding:40px;color:var(--text-faint)"><i class="ti ti-circle-check" style="font-size:28px;display:block;margin-bottom:8px;color:#27500A"></i>Aucune commande ouverte sur les références RTD</div>';
+    }
+
+  } else {
+    // ── Vue détail : commandes d'un client (ou d'un client final RTD) ──────
+    const col = (isRTD && cdeSelectedFinalClient) ? cdeColorForFinalClient(cdeSelectedFinalClient)
+      : (CLIENT_COLORS[isRTD ? 'RTD' : cdeSelectedClient] || COL_DEFAULT);
+    const search = cdeSearchFilter.toLowerCase();
+
+    if (isRTD) {
+      breadcrumb = '<span style="font-size:11px;color:var(--text-faint)">'
+        + '<span data-cde-action="back-to-final-clients" style="color:var(--text-faint);text-decoration:underline;cursor:pointer">RTD</span>'
+        + ' <i class="ti ti-chevron-right" style="font-size:10px;vertical-align:-1px"></i> '+cdeSelectedFinalClient+'</span>';
+    }
+
+    const refsForClient = byClient[cdeSelectedClient] || [];
+    const rows = [];
+
+    if (isRTD && cdeSelectedFinalClient) {
+      // Client d'abord, produit ensuite : toutes les commandes de ce client final,
+      // directement depuis les données brutes (CODCLI/LIBFOU) — sans dépendre de
+      // PDP_CORRESPONDANCES. Certaines références commandées (forets, kits,
+      // consommables...) n'y sont jamais suivies (pas de nomenclature tenon→
+      // blister→FG) et étaient donc invisibles avec l'ancienne approche
+      // "produit d'abord" qui ne regardait QUE les références déjà connues.
+      const corrByCode = {};
+      (typeof pdpGetActiveCorrespondances === 'function' ? pdpGetActiveCorrespondances() : []).forEach(r => {
+        corrByCode[r.code_client] = r;
+      });
+
+      // Même dédup que cdeGetAllOpenLines/cdeGetForRef (voir leurs commentaires) :
+      // une ligne de commande livrée en plusieurs BL partiels apparaît plusieurs
+      // fois dans l'export brut avec les mêmes QTE_CDE/QTE_LIVREE (des totaux de
+      // ligne, pas des quantités par BL) — sans ça, une commande s'affichait en
+      // double dans cette vue "client final RTD" précisément.
+      const seenLignesRTD = new Set();
+      const dedupedCommandesRTD = (pcData.commandes||[]).filter(c => {
+        const key = String(c.NUM_COM||'') + '|' + String(c.LIGNE_COM||'');
+        if (seenLignesRTD.has(key)) return false;
+        seenLignesRTD.add(key);
+        return true;
+      });
+
+      dedupedCommandesRTD.forEach(c => {
+        const clientLabel = String(c.LIBFOU||c.CODCLI||'').trim() || 'Client non renseigné';
+        if (clientLabel !== cdeSelectedFinalClient) return;
+        const qteRest = (Number(c.QTE_CDE)||0) - (Number(c.QTE_LIVREE)||0);
+        if (qteRest <= 0) return;
+        const code = String(c.REF_RTD||'').trim();
+        const corr = corrByCode[code]; // enrichissement si le produit est suivi, sinon on affiche quand même la ligne
+        rows.push({
+          numCmd:  String(c.NUM_COM||''),
+          client:  clientLabel,
+          codcli:  String(c.CODCLI||'').trim(),
+          ref:     code,
+          qteCde:  Number(c.QTE_CDE)||0,
+          qteLiv:  Number(c.QTE_LIVREE)||0,
+          qteRest,
+          datDem:  cdeToISODate(c.DATDEM),
+          datDel:  cdeToISODate(c.DATDEL),
+          libelle: corr ? corr.libelle_fg : (String(c.LIBELL||'').trim() || code),
+          codart_wip: corr ? corr.codart_wip : null,
+          code_client: corr ? corr.code_client : code,
+        });
+      });
+    } else {
+      refsForClient.forEach(r => {
+        const fg = cdeResolveToFG(r.codart_wip, r.code_client);
+        const cmds = cdeGetForRef(fg);
+        cmds.forEach(c => rows.push(Object.assign({}, c, {
+          libelle: r.libelle_fg,
+          codart_wip: r.codart_wip,
+          code_client: r.code_client,
+        })));
+      });
+    }
+
+    rows.sort((a,b) => (a.datDel||'9999').localeCompare(b.datDel||'9999'));
+
+    const filteredRows = rows.filter(r =>
+      !search || r.libelle.toLowerCase().includes(search) || r.numCmd.toLowerCase().includes(search) || r.client.toLowerCase().includes(search)
+    );
+
+    // Conservées pour que cdeShowOrderDetail() puisse retrouver le détail complet
+    // d'une commande au clic, sans recalculer le regroupement.
+    _cdeCurrentRows = filteredRows;
+
+    const totalQte = filteredRows.reduce((s,r) => s+r.qteRest, 0);
+
+    // Regroupement par n° de commande : une ligne de tableau par commande,
+    // le détail ligne-à-ligne (avec le stock disponible) s'ouvre au clic.
+    const byOrder = {};
+    filteredRows.forEach(r => {
+      byOrder[r.numCmd] = byOrder[r.numCmd] || { numCmd:r.numCmd, client:r.client, lines:[], totalRestant:0, dates:new Set() };
+      byOrder[r.numCmd].lines.push(r);
+      byOrder[r.numCmd].totalRestant += r.qteRest;
+      if (r.datDel) byOrder[r.numCmd].dates.add(r.datDel);
+    });
+    const orders = Object.values(byOrder).sort((a,b) => {
+      const da = [...a.dates].sort()[0] || '9999';
+      const db = [...b.dates].sort()[0] || '9999';
+      return da.localeCompare(db);
+    });
+
+    mainContent += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'
+      + '<div style="background:'+col.bg+';border:1px solid '+col.dot+'33;border-radius:var(--radius);padding:12px 16px;flex:1;min-width:100px">'
+      + '<div style="font-size:10px;color:'+col.text+';font-weight:600;text-transform:uppercase">Commandes</div>'
+      + '<div style="font-size:22px;font-weight:700;color:'+col.text+'">'+orders.length+'</div></div>'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:100px">'
+      + '<div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Total restant</div>'
+      + '<div style="font-size:22px;font-weight:700;color:#A32D2D">'+totalQte.toLocaleString('fr')+'</div></div>'
+      + '</div>';
+
+    if (orders.length) {
+      // Colonne Référence : n'a de sens que pour 3M, dont les commandes n'ont
+      // jamais qu'une seule ligne (demandé par Stéphane, 26/07/2026) — pour les
+      // autres clients une commande peut avoir plusieurs lignes, donc "la"
+      // référence n'aurait pas de sens dans une seule cellule.
+      const showRefCol = cdeSelectedClient === '3M';
+      mainContent += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">'
+        + '<div style="overflow-x:auto"><table class="cat-table" style="min-width:700px">'
+        + '<thead><tr><th>N° Cde</th><th>Client final</th>'
+        + (showRefCol ? '<th>Référence</th>' : '')
+        + '<th style="text-align:right">Lignes</th>'
+        + '<th style="text-align:right">Restant</th><th>Livraison</th><th></th></tr></thead><tbody>';
+      orders.forEach(o => {
+        const dates = [...o.dates].sort();
+        const dateLabel = dates.length===0 ? '—'
+          : dates.length===1 ? cdeFmtDate(dates[0])
+          : cdeFmtDate(dates[0])+' → '+cdeFmtDate(dates[dates.length-1]);
+        mainContent += '<tr data-cde-action="show-order" data-cde-arg="'+o.numCmd.replace(/"/g,'&quot;')+'" style="cursor:pointer" onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'\'">'
+          + '<td style="font-size:11px;font-weight:600;font-family:monospace;color:var(--accent)">'+o.numCmd+'</td>'
+          + '<td style="font-size:12px">'+o.client+'</td>'
+          + (showRefCol ? '<td style="font-size:12px;color:var(--text-muted)">'+(o.lines[0]?o.lines[0].libelle:'—')+'</td>' : '')
+          + '<td style="text-align:right;font-size:12px">'+o.lines.length+'</td>'
+          + '<td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">'+o.totalRestant.toLocaleString('fr')+'</span></td>'
+          + '<td style="font-size:11px;color:var(--text-muted)">'+dateLabel+'</td>'
+          + '<td style="text-align:right;color:var(--text-faint)"><i class="ti ti-chevron-right"></i></td>'
+          + '</tr>';
+      });
+      mainContent += '</tbody></table></div></div>';
+    } else {
+      mainContent += '<div style="text-align:center;padding:40px;color:var(--text-faint)"><i class="ti ti-circle-check" style="font-size:28px;display:block;margin-bottom:8px;color:#27500A"></i>Aucune commande ouverte</div>';
+    }
+  }
+
+  // Bouton retour : depuis le détail RTD → liste des clients finaux ; sinon → tous les clients
+  const backAction = (isRTD && cdeSelectedFinalClient)
+    ? 'data-cde-action="back-to-final-clients"'
+    : 'data-cde-action="select-client" data-cde-arg=""';
+  const backLabel = (isRTD && cdeSelectedFinalClient) ? 'Clients finaux RTD' : 'Tous les clients';
+  const showSearch = !!cdeSelectedClient && !(isRTD && !cdeSelectedFinalClient);
+
+  el.innerHTML =
+    '<div style="flex:1;overflow:hidden;display:flex;flex-direction:column">'
+    + '<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface)">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<h2 style="font-size:17px;font-weight:600"><i class="ti ti-shopping-cart" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Commandes</h2>'
+    + (!cdeSelectedClient ? modeToggle : '')
+    + (cdeSelectedClient ? '<button class="btn" '+backAction+' style="font-size:11px;padding:4px 10px"><i class="ti ti-arrow-left"></i> '+backLabel+'</button>' : '')
+    + (breadcrumb ? breadcrumb : '')
+    + '</div>'
+    + (showSearch
+        ? '<input id="cde-search-input" placeholder="Filtrer (référence, n° commande, client)…" value="'+cdeSearchFilter+'" oninput="cdeSearch(this.value)" style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:280px">'
+        : '<span style="font-size:11px;color:var(--text-faint)">'+(!cdeSelectedClient ? 'Cliquez sur un client pour voir le détail de ses commandes' : 'Cliquez sur un client final pour voir le détail de ses commandes')+'</span>')
+    + '</div>'
+    + '<div style="flex:1;overflow-y:auto;padding:16px 20px">' + mainContent + '</div>'
+    + '</div>';
+}

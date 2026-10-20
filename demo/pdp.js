@@ -1,0 +1,1860 @@
+
+// Jauge de couverture : part des commandes couverte par stock + en cours.
+function pdpCovBar(stock, cdes) {
+  if (!(cdes > 0)) return '<div class="cov"><i style="width:100%;background:#9AA7B2;opacity:.45"></i></div><div class="cov-note"><span>Aucune commande</span><span></span></div>';
+  const pct = Math.max(0, Math.min(1, stock / cdes));
+  const color = pct >= 1 ? '#1D9E75' : pct >= 0.6 ? '#D4880A' : '#C2362E';
+  return '<div class="cov"><i style="width:' + Math.max(pct * 100, 3).toFixed(0) + '%;background:' + color + '"></i></div>'
+    + '<div class="cov-note"><span>Couverture des commandes</span><span style="color:' + color + ';font-weight:700">' + Math.round(pct * 100) + ' %</span></div>';
+}
+// ═══════════════════════════════════════════════════════════
+// pdp.js — Plan Directeur de Production
+// ═══════════════════════════════════════════════════════════
+
+const PDP_CORRESPONDANCES = [{"client": "3M", "famille": "3M", "code_client": "7100318946", "libelle_fg": "RelyX Fiber Post Size 0 1.1mm", "codart_wip": "TENON_W0_JTO"}, {"client": "3M", "famille": "3M", "code_client": "7100319078", "libelle_fg": "RelyX Fiber Post Size 1 / 1.3mm", "codart_wip": "TENON_W1_JTO"}, {"client": "3M", "famille": "3M", "code_client": "7100318947", "libelle_fg": "RelyX Fiber Post Size 2 1.6mm", "codart_wip": "TENON_W2_JTO"}, {"client": "3M", "famille": "3M", "code_client": "7100318549", "libelle_fg": "RelyX Fiber Post Size 3 1.9mm", "codart_wip": "TENON_W3_JTO"}, {"client": "3M", "famille": "3M", "code_client": "7100288480", "libelle_fg": "RelyX Fiber Post 3D W40 XRO", "codart_wip": "TENON_W40_JTO_XRO3%"}, {"client": "3M", "famille": "3M", "code_client": "7100288479", "libelle_fg": "RelyX Fiber Post 3D W41 XRO", "codart_wip": "TENON_W41_JTO_XRO3%"}, {"client": "3M", "famille": "3M", "code_client": "7100288478", "libelle_fg": "RelyX Fiber Post 3D W42 XRO", "codart_wip": "TENON_W42_JTO_XRO3%"}, {"client": "3M", "famille": "3M", "code_client": "7100288477", "libelle_fg": "RelyX Fiber Post 3D W43 XRO", "codart_wip": "TENON_W43_JTO_XRO3%"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0520001", "libelle_fg": "Tenon K 300 JNT-XRO", "codart_wip": "K_300_JNT_XRO"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0520002", "libelle_fg": "Tenon K 1.2 ROD JNT-XRO", "codart_wip": "K_1.2_ROD_JNT_XRO"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0620001", "libelle_fg": "Tenon K 0,5 JNT-XRO", "codart_wip": "K05_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0620002", "libelle_fg": "Tenon K 0,9 JNT-XRO", "codart_wip": "K09_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0620003", "libelle_fg": "Tenon K 1,1 JNT-XRO", "codart_wip": "K11L27_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0620004", "libelle_fg": "Tenon K 0,7 JNT-XRO", "codart_wip": "K07_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0630001", "libelle_fg": "Tenon K 0,5 L 27 JNT-XRO", "codart_wip": "TENON_K05_L27_C_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0630002", "libelle_fg": "Tenon K 0,9  L27 JNT-XRO", "codart_wip": "K09_L27_JNTXRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0630003", "libelle_fg": "Tenon K 1,1  L27 JNT-XRO", "codart_wip": "K11L27_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G0630004", "libelle_fg": "Tenon K 0,7  L27 JNT-XRO", "codart_wip": "K07L27_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1500004", "libelle_fg": "Tenon K135 JNT XRO", "codart_wip": "K_135_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1500005", "libelle_fg": "tenon K145 JNT XRO", "codart_wip": "K_145_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1500006", "libelle_fg": "Tenon K155 JNT XRO", "codart_wip": "K_155_JNT_XRO"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820001", "libelle_fg": "TENON K-101 JNT-XRO", "codart_wip": "K_101_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820003", "libelle_fg": "TENON K-104 JNT-XRO", "codart_wip": "K_104_JNT_XRO_IND_C"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820004", "libelle_fg": "TENON K-105 JNT-XRO", "codart_wip": "K_105_JNT_XRO"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820005", "libelle_fg": "TENON K-107 JNT-XRO", "codart_wip": "K_107_JNT_XRO_1"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820006", "libelle_fg": "TENON K-108 JNT-XRO", "codart_wip": "K_108_JNT_XRO_INDC"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820007", "libelle_fg": "TENON K-110 JNT-XRO", "codart_wip": "K_110_JNT_XRO"}, {"client": "BRASSELER", "famille": "BRASSELER", "code_client": "G1820008", "libelle_fg": "TENON K-111 JNT-XRO", "codart_wip": "K_111_JNT_XRO_1"}, {"client": "APOL", "famille": "APOL", "code_client": "2010311", "libelle_fg": "TENON RS 1275", "codart_wip": "RS_1275_ROSE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010312", "libelle_fg": "TENON RS 1208", "codart_wip": "RS_1208_ROSE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010313", "libelle_fg": "TENON RS 1209", "codart_wip": "RS_1209_ROSE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010314", "libelle_fg": "TENON RS 1210", "codart_wip": "RS_1210_ROSE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010315", "libelle_fg": "TENON RS 1495", "codart_wip": "RS_1495_BLEU"}, {"client": "APOL", "famille": "APOL", "code_client": "2010316", "libelle_fg": "TENON RS 1410", "codart_wip": "RS_1410_BLEU"}, {"client": "APOL", "famille": "APOL", "code_client": "2010317", "libelle_fg": "TENON RS 1411", "codart_wip": "RS_1411_BLEU"}, {"client": "APOL", "famille": "APOL", "code_client": "2010318", "libelle_fg": "TENON RS 1412", "codart_wip": "RS_1412_BLEU"}, {"client": "APOL", "famille": "APOL", "code_client": "2010319", "libelle_fg": "TENON RS 1610", "codart_wip": "RS_1610_JAUNE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010320", "libelle_fg": "TENON RS 1611", "codart_wip": "RS_1611_JAUNE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010321", "libelle_fg": "TENON RS 1612", "codart_wip": "RS_1612_JAUNE"}, {"client": "APOL", "famille": "APOL", "code_client": "2010322", "libelle_fg": "TENON RS 1613", "codart_wip": "RS_1613_JAUNE"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "E1020001", "libelle_fg": "EASY POST # 1", "codart_wip": "S1_JTO_BLANC"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "E1020002", "libelle_fg": "EASY POST # 2", "codart_wip": "S2_JTO_BLANC"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "E1020003", "libelle_fg": "EASY POST # 3", "codart_wip": "S3_JTO_BLANC"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "E1020004", "libelle_fg": "EASY POST # 4", "codart_wip": "S4_JTO_BLANC"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "E1020005", "libelle_fg": "EASY POST # 5", "codart_wip": "S5_JTO_BLANC"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "E1020006", "libelle_fg": "EASY POST # 6", "codart_wip": "S6_JTO_BLANC"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "F1020001", "libelle_fg": "RADIX FIBER POST # 1", "codart_wip": "S1_JTO"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "F1020002", "libelle_fg": "RADIX FIBER POST # 2", "codart_wip": "S2_JTO"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "F1020003", "libelle_fg": "RADIX FIBER POST # 3", "codart_wip": "S3_JTO"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "F1020004", "libelle_fg": "RADIX FIBER POST # 4", "codart_wip": "S4_JTO"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "F1020005", "libelle_fg": "RADIX FIBER POST # 5", "codart_wip": "S5_JTO"}, {"client": "MAILLEFER", "famille": "MAILLEFER", "code_client": "F1020006", "libelle_fg": "RADIX FIBER POST # 6", "codart_wip": "S6_JTO"}, {"client": "ULTRADENT", "famille": "ULTRADENT", "code_client": "G1120000", "libelle_fg": "FIBER POST # 0 JNT XRO", "codart_wip": "TENON_N0_IND_E_1"}, {"client": "ULTRADENT", "famille": "ULTRADENT", "code_client": "G1120001", "libelle_fg": "FIBER POST # 1 JNT XRO", "codart_wip": "TENON_N1_IND_E_1"}, {"client": "ULTRADENT", "famille": "ULTRADENT", "code_client": "G1120002", "libelle_fg": "FIBER POST # 2 JNT XRO", "codart_wip": "TENON_N2_IND_E_1"}, {"client": "ULTRADENT", "famille": "ULTRADENT", "code_client": "G1120003", "libelle_fg": "FIBER POST # 3 JNT XRO", "codart_wip": "TENON_N3_IND_E_1"}, {"client": "ULTRADENT", "famille": "ULTRADENT", "code_client": "G1120004", "libelle_fg": "FIBER POST # 4 JNT XRO", "codart_wip": "TENON_N4_IND_E_1"}, {"client": "VDW VRAC", "famille": "VDW VRAC", "code_client": "2110301", "libelle_fg": "TENON L POSTS 01", "codart_wip": "L01_JTR"}, {"client": "VDW VRAC", "famille": "VDW VRAC", "code_client": "2110302", "libelle_fg": "TENON L POSTS 02", "codart_wip": "L02_JTR"}, {"client": "VDW VRAC", "famille": "VDW VRAC", "code_client": "2110303", "libelle_fg": "TENON L POSTS 03", "codart_wip": "L03_JTR"}, {"client": "AXIS", "famille": "AXIS", "code_client": "F080C100", "libelle_fg": "TENON AI1", "codart_wip": "AI1_JTO_BLANC"}, {"client": "AXIS", "famille": "AXIS", "code_client": "F080C200", "libelle_fg": "TENON AI2", "codart_wip": "AI2_JTO_BLANC"}, {"client": "AXIS", "famille": "AXIS", "code_client": "F100C300", "libelle_fg": "TENON AI3", "codart_wip": "AI3_JTO_BLANC"}, {"client": "AXIS", "famille": "AXIS", "code_client": "F100C400", "libelle_fg": "TENON AI4", "codart_wip": "AI4_JTO_BLANC"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590311B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #1", "codart_wip": "AE1_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590351B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #1", "codart_wip": "AE1_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590312B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #2", "codart_wip": "AE2_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590352B", "libelle_fg": "5 MACRO-LOCK POST ILLUSION #2", "codart_wip": "AE2_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590313B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #3", "codart_wip": "AE3_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590353B", "libelle_fg": "5 MACRO-LOCK POST ILLUSION #3", "codart_wip": "AE3_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590314B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #4", "codart_wip": "AE4_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590354B", "libelle_fg": "5 MACRO-LOCK POST ILLUSION #4", "codart_wip": "AE4_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590315B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #5", "codart_wip": "AE5_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590355B", "libelle_fg": "5 MACRO-LOCK POST ILLUSION #5", "codart_wip": "AE5_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590316B", "libelle_fg": "10 MACRO-LOCK POST ILLUSION #6", "codart_wip": "AE6_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macro Ill XRO", "code_client": "4590356B", "libelle_fg": "5 MACRO-LOCK POST ILLUSION #6", "codart_wip": "AE6_ILLUSION_X-RO"}, {"client": "RTD", "famille": "Macrolock", "code_client": "4510311B", "libelle_fg": "10 MACRO-LOCK POST #1", "codart_wip": "AE1_JTR"}, {"client": "RTD", "famille": "Macrolock", "code_client": "4510312B", "libelle_fg": "10 MACRO-LOCK POST #2", "codart_wip": "AE2_JTR"}, {"client": "RTD", "famille": "Macrolock", "code_client": "4510313B", "libelle_fg": "10 MACRO-LOCK POST #3", "codart_wip": "AE3_JTR"}, {"client": "RTD", "famille": "Macrolock", "code_client": "4510353B", "libelle_fg": "5 MACRO-LOCK POST #3", "codart_wip": "AE3_JTR"}, {"client": "RTD", "famille": "Macrolock", "code_client": "4510314B", "libelle_fg": "10 MACRO-LOCK POST #4", "codart_wip": "AE4_JTR"}, {"client": "RTD", "famille": "Macrolock", "code_client": "4510354B", "libelle_fg": "5 MACRO-LOCK POST #4", "codart_wip": "AE4_JTR"}, {"client": "RTD", "famille": "Macro Oval", "code_client": "46900501", "libelle_fg": "5 MACRO-LOCK OVAL POSTS #1", "codart_wip": "ML_OVALE_1"}, {"client": "RTD", "famille": "Macro Oval", "code_client": "46900502", "libelle_fg": "5 MACRO-LOCK OVAL POSTS #2", "codart_wip": "ML_OVALE_2"}, {"client": "RTD", "famille": "Macro Oval", "code_client": "46900503", "libelle_fg": "5 MACRO-LOCK OVAL POSTS #3", "codart_wip": "ML_OVALE_3"}, {"client": "RTD", "famille": "Macro Oval", "code_client": "46900504", "libelle_fg": "5 MACRO-LOCK OVAL POSTS #4", "codart_wip": "ML_OVALE_4"}, {"client": "RTD", "famille": "Matchpost", "code_client": "4810010B", "libelle_fg": "10 MATCHPOST #1.0", "codart_wip": "AD1_JTR"}, {"client": "RTD", "famille": "Matchpost", "code_client": "4810012B", "libelle_fg": "10 MATCHPOST #1.2", "codart_wip": "AD2_JTR"}, {"client": "RTD", "famille": "Matchpost", "code_client": "4810014B", "libelle_fg": "10 MATCHPOST #1.4", "codart_wip": "AD3_JTR"}, {"client": "RTD", "famille": "Matchpost", "code_client": "4810016B", "libelle_fg": "10 MATCHPOST #1.6", "codart_wip": "AD4_JTR"}, {"client": "RTD", "famille": "DT Light", "code_client": "1510310B", "libelle_fg": "10 D.T. LIGHT-POST #0.5", "codart_wip": "80.04SG_JTR"}, {"client": "RTD", "famille": "DT Light", "code_client": "1510311B", "libelle_fg": "10 D.T. LIGHT-POST #1", "codart_wip": "90.06SG_JTR"}, {"client": "RTD", "famille": "DT Light", "code_client": "1510312B", "libelle_fg": "10 D.T. LIGHT-POST #2", "codart_wip": "100.08SG_JTR"}, {"client": "RTD", "famille": "DT Light", "code_client": "1510313B", "libelle_fg": "10 D.T. LIGHT-POST #3", "codart_wip": "120.10SG_JTR"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590310B", "libelle_fg": "10 D.T. LIGHT-POST ILLUSION #0.5", "codart_wip": "80.04_ILLU_XRO_NOIR"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590350B", "libelle_fg": "5 D.T. LIGHT-POST ILLUSION #0.5", "codart_wip": "80.04_ILLU_XRO_NOIR"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590311B", "libelle_fg": "10 D.T. LIGHT POST ILLUSION #1", "codart_wip": "90.06_ILLU_XRO_ROUGE"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590351B", "libelle_fg": "5 D.T. LIGHT POST ILLUSION #1", "codart_wip": "90.06_ILLU_XRO_ROUGE"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590312B", "libelle_fg": "10 D.T. LIGHT POST ILLUSION #2", "codart_wip": "100.08_ILLU_XRO_JAUN"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590352B", "libelle_fg": "5 D.T. LIGHT POST ILLUSION #2", "codart_wip": "100.08_ILLU_XRO_JAUN"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590313B", "libelle_fg": "10 D.T. LIGHT POST ILLUSION 3", "codart_wip": "120.10_ILLU_XRO_BLEU"}, {"client": "RTD", "famille": "DT Ill XRO", "code_client": "1590353B", "libelle_fg": "5 D.T. LIGHT POST ILLUSION 3", "codart_wip": "120.10_ILLU_XRO_BLEU"}, {"client": "RTD", "famille": "Endo", "code_client": "1110311B", "libelle_fg": "10 ENDO LIGHT-POST #90", "codart_wip": "90SG_JTR"}, {"client": "RTD", "famille": "Endo", "code_client": "1110312B", "libelle_fg": "10 ENDO LIGHT-POST #100", "codart_wip": "100SG_JTR"}, {"client": "RTD", "famille": "Endo", "code_client": "1110313B", "libelle_fg": "10 ENDO LIGHT-POST #120", "codart_wip": "120SG_JTR"}, {"client": "RTD", "famille": "NTI", "code_client": "H1510310B", "libelle_fg": "10 FIBERMASTER POST #0", "codart_wip": "80.04SG_JTR"}, {"client": "RTD", "famille": "NTI", "code_client": "H1510311B", "libelle_fg": "10 FIBERMASTER POST #1", "codart_wip": "90.06AG_JTR"}, {"client": "RTD", "famille": "NTI", "code_client": "H1510312B", "libelle_fg": "10 FIBERMASTER POST #2", "codart_wip": "100.08AG_JTR"}, {"client": "RTD", "famille": "NTI", "code_client": "H1510313B", "libelle_fg": "10 FIBERMASTER POST #3", "codart_wip": "120.10AG_JTR"}, {"client": "3M", "famille": "3M", "code_client": "7100288476", "libelle_fg": "RelyX Fiber Post Drill UNI", "codart_wip": "FINITION_DRILL_W#UNI"}, {"client": "3M", "famille": "3M", "code_client": "7100288475", "libelle_fg": "RelyX Fiber Post Drill Size 0", "codart_wip": "FINITION_DRILL_W#0"}, {"client": "3M", "famille": "3M", "code_client": "7100288474", "libelle_fg": "RelyX Fiber Post Drill Size 1", "codart_wip": "FINITION_DRILL_W#1"}, {"client": "3M", "famille": "3M", "code_client": "7100288473", "libelle_fg": "RelyX Fiber Post Drill Size 2", "codart_wip": "FINITION_DRILL_W#2"}, {"client": "3M", "famille": "3M", "code_client": "7100288472", "libelle_fg": "RelyX Fiber Post Drill Size 3", "codart_wip": "FINITION_DRILL_W#3"}, {"client": "GC", "famille": "GC", "code_client": "F021C05XB", "libelle_fg": "BLISTER OF 5 POST 0.8", "codart_wip": "PF_0.8__22MM_JAR"}, {"client": "GC", "famille": "GC", "code_client": "F021C050B", "libelle_fg": "BLISTER OF 5 POST 1.0", "codart_wip": "PF_1.0__22MM_JAR"}, {"client": "GC", "famille": "GC", "code_client": "F021C051B", "libelle_fg": "BLISTER OF 5 POST 1.2", "codart_wip": "PF_1.2_JAR"}, {"client": "GC", "famille": "GC", "code_client": "F021C052B", "libelle_fg": "BLISTER OF 5 POST 1.4", "codart_wip": "PF_1.4_JAR"}, {"client": "GC", "famille": "GC", "code_client": "F021C053B", "libelle_fg": "BLISTER OF 5 POST 1.6", "codart_wip": "PF_1.6_JAR"}, {"client": "RTD", "famille": "DRILL", "code_client": "1520110", "libelle_fg": "DRILL DT0.5", "codart_wip": "FINITION_DRILL_DT0.5"}, {"client": "RTD", "famille": "DRILL", "code_client": "1520111", "libelle_fg": "DRILL DT1", "codart_wip": "FINITION_DRILL_DT1"}, {"client": "RTD", "famille": "DRILL", "code_client": "1520112", "libelle_fg": "DRILL DT2", "codart_wip": "FINITION_DRILL_DT2"}, {"client": "RTD", "famille": "DRILL", "code_client": "1520113", "libelle_fg": "DRILL DT3", "codart_wip": "FINITION_DRILL_DT3"}, {"client": "TOKUYAMA", "famille": "TOKUYAMA", "code_client": "F171C101", "libelle_fg": "16 JAR", "codart_wip": "16_JAR"}, {"client": "TOKUYAMA", "famille": "TOKUYAMA", "code_client": "F171C102", "libelle_fg": "17 JAR", "codart_wip": "17_JAR"}, {"client": "TOKUYAMA", "famille": "TOKUYAMA", "code_client": "F171C103", "libelle_fg": "18 JAR", "codart_wip": "18_JAR"}, {"client": "TOKUYAMA", "famille": "TOKUYAMA", "code_client": "F171C104", "libelle_fg": "19 JAR", "codart_wip": "19_JAR"}, {"client": "SHOFU", "famille": "SHOFU", "code_client": "AHSH0001", "libelle_fg": "AH1", "codart_wip": "AH1"}, {"client": "SHOFU", "famille": "SHOFU", "code_client": "AHSH0002", "libelle_fg": "AH2", "codart_wip": "AH2"}, {"client": "SHOFU", "famille": "SHOFU", "code_client": "AHSH0003", "libelle_fg": "AH3", "codart_wip": "AH3"}, {"client": "SHOFU", "famille": "SHOFU", "code_client": "AHSH0004", "libelle_fg": "AH4", "codart_wip": "AH4"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4820216", "libelle_fg": "1 FINISHING DRILL MATCHPOST", "codart_wip": "4820216"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4820214", "libelle_fg": "1 FINISHING DRILL MATCHPOST", "codart_wip": "4820214"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4820212", "libelle_fg": "1 FINISHING DRILL MATCHPOST", "codart_wip": "4820212"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4820210", "libelle_fg": "1 FINISHING DRILL MATCHPOST", "codart_wip": "4820210"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4820102", "libelle_fg": "1 STARTER DRILL MATCHPOST #2", "codart_wip": "4820102"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4820101", "libelle_fg": "1 STARTER DRILL MATCHPOST #1", "codart_wip": "4820101"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520126", "libelle_fg": "1 FINISHING DRILL MACRO-LOCK", "codart_wip": "4520126"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520125", "libelle_fg": "1 FINISHING DRILL MACRO-LOCK", "codart_wip": "4520125"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520124", "libelle_fg": "1 FINISHING DRILL MACRO-LOCK", "codart_wip": "4520124"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520123", "libelle_fg": "1 FINISHING DRILL MACRO-LOCK", "codart_wip": "4520123"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520122", "libelle_fg": "1 FINISHING DRILL MACRO-LOCK", "codart_wip": "4520122"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520121", "libelle_fg": "1 FINISHING DRILL MACRO-LOCK", "codart_wip": "4520121"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4520119", "libelle_fg": "1 STARTER DRILL MACRO-LOCK #2", "codart_wip": "4520119"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4800002", "libelle_fg": "MATCHPOST INTROKIT B", "codart_wip": "4800002"}, {"client": "RTD", "famille": "Consommables & accessoires", "code_client": "4800001", "libelle_fg": "MATCHPOST INTROKIT A", "codart_wip": "4800001"}, {"client": "3M", "famille": "3M", "code_client": "7100288485", "libelle_fg": "Introkit 3D", "codart_wip": "INTROKIT_3D_KIT"}, {"client": "3M", "famille": "3M", "code_client": "7100254820", "libelle_fg": "Introkit Standard", "codart_wip": "INTROKIT_STD_KIT"}];
+
+// Composition des introkits (boîtes qui regroupent plusieurs références) —
+// donnée par Stéphane le 18/08/2026. Chaque composant est identifié par son
+// codart au niveau BLISTER (le niveau retenu pour le calcul de stock
+// disponible, voir pdpIntrokitStockDispo), avec la quantité de blisters
+// nécessaire pour composer 1 kit. Les codarts Drill viennent des
+// nomenclatures Forets existantes (BL_DRILL_W#x_MDR), les codarts Blister
+// des nomenclatures tenons 3M standards (BLISTER_Wx_MDR).
+const INTROKITS = {
+  '7100288485': {
+    nom: 'Introkit 3D',
+    composants: [
+      { label: 'Drill Uni',      codart: 'BL_DRILL_W#UN_MDR', qte: 1 },
+      { label: 'Drill W0',       codart: 'BL_DRILL_W#0_MDR',  qte: 1 },
+      { label: 'Drill W1',       codart: 'BL_DRILL_W#1_MDR',  qte: 1 },
+      { label: 'Drill W2',       codart: 'BL_DRILL_W#2_MDR',  qte: 1 },
+      { label: 'Drill W3',       codart: 'BL_DRILL_W#3_MDR',  qte: 1 },
+      { label: 'Blister 3D W40', codart: 'BLISTER_W40_MDR',   qte: 1 },
+      { label: 'Blister 3D W41', codart: 'BLISTER_W41_MDR',   qte: 1 },
+      { label: 'Blister 3D W42', codart: 'BLISTER_W42_MDR',   qte: 1 },
+      { label: 'Blister 3D W43', codart: 'BLISTER_W43_MDR',   qte: 1 },
+    ],
+  },
+  '7100254820': {
+    nom: 'Introkit Standard',
+    composants: [
+      { label: 'Drill Uni', codart: 'BL_DRILL_W#UN_MDR', qte: 1 },
+      { label: 'Drill W1',  codart: 'BL_DRILL_W#1_MDR',  qte: 1 },
+      { label: 'Drill W2',  codart: 'BL_DRILL_W#2_MDR',  qte: 1 },
+      { label: 'Drill W3',  codart: 'BL_DRILL_W#3_MDR',  qte: 1 },
+      { label: 'Blister W1', codart: 'BLISTER_W1_MDR',   qte: 1 },
+      { label: 'Blister W2', codart: 'BLISTER_W2_MDR',   qte: 1 },
+      { label: 'Blister W3', codart: 'BLISTER_W3_MDR',   qte: 1 },
+    ],
+  },
+  '4800002': {
+    nom: 'MATCHPOST INTROKIT B',
+    // Composition donnée par Stéphane le 18/08/2026 (export nomenclature SAP) —
+    // codarts pris directement au niveau des 5 lignes de tête (surlignées en
+    // bleu sur l'export), pas de correspondance nomenclatures/FINITION_* à
+    // construire ici : pdpGetStockForWip matche ces codes tels quels contre le
+    // stock importé (PTSTOCKSIMPLE), donc les codes SAP bruts fonctionnent
+    // directement. Déjà présent dans PDP_CORRESPONDANCES (client RTD, famille
+    // Consommables & accessoires) — pas de nouvelle tuile à créer, juste sa
+    // composition qui active le calcul de stock/à-produire spécifique kit.
+    composants: [
+      { label: 'Vrac MATCHPOST 5 posts 1.4', codart: '48100503', qte: 1 },
+      { label: 'Vrac MATCHPOST 5 posts 1.6', codart: '48100504', qte: 1 },
+      { label: 'Blister MATCHPOST Drills — starter #2 (1.4-1.6)', codart: '4820102V', qte: 1 },
+      { label: 'Blister MATCHPOST Drills — finishing 1.4', codart: '4820214V', qte: 1 },
+      { label: 'Blister MATCHPOST Drills — finishing 1.6', codart: '4820216V', qte: 1 },
+    ],
+  },
+};
+
+// Stock disponible en kits = le composant le plus rare (stock blister ÷
+// quantité nécessaire par kit, arrondi à l'entier inférieur), comme demandé.
+function pdpIntrokitStockDispo(kit) {
+  if (!kit || !kit.composants || !kit.composants.length) return 0;
+  let min = Infinity;
+  kit.composants.forEach(c => {
+    const stk = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip(c.codart) : 0;
+    const possible = Math.floor((stk || 0) / (c.qte || 1));
+    if (possible < min) min = possible;
+  });
+  return min === Infinity ? 0 : min;
+}
+
+// Catégorise une référence pour le regroupement visuel dans la grille PDP —
+// standard / 3D / drill / introkit, détecté sur le libellé (pas de champ
+// dédié dans les correspondances) ou, pour les introkits, sur leur présence
+// dans INTROKITS. Demandé par Stéphane, 12/08/2026 (standard/3D/drill) puis
+// 18/08/2026 (introkit), pour séparer visuellement ces familles dans la vue
+// par client (ex: 3M).
+function pdpCategoryOf(r) {
+  if (typeof INTROKITS !== 'undefined' && INTROKITS[r.code_client]) return 'introkit';
+  const label = String((r.libelle_fg || r.codart_wip || '')).toUpperCase();
+  if (/\bDRILL\b/.test(label)) return 'drill';
+  if (/\b3D\b/.test(label)) return '3d';
+  return 'standard';
+}
+const PDP_CATEGORY_LABELS = { standard: 'Tenons standards', '3d': 'Tenons 3D', drill: 'Forets (Drills)', introkit: 'Introkits' };
+
+const PDP_CLIENT_COLORS = {
+  '3M':        {bg:'#E0F2FE', dot:'#0EA5E9', text:'#0C4A6E'},
+  'BRASSELER': {bg:'#E8F0FE', dot:'#4C8EDA', text:'#185FA5'},
+  'APOL':      {bg:'#FCE8F3', dot:'#C026D3', text:'#86198F'},
+  'MAILLEFER': {bg:'#FEF3C7', dot:'#D97706', text:'#92400E'},
+  'ULTRADENT': {bg:'#D1FAE5', dot:'#059669', text:'#065F46'},
+  'VDW VRAC':  {bg:'#FEE2E2', dot:'#DC2626', text:'#991B1B'},
+  'AXIS':      {bg:'#EDE9FE', dot:'#7C3AED', text:'#4C1D95'},
+  'SHOFU':     {bg:'#F0FDF4', dot:'#16A34A', text:'#14532D'},
+  'RTD':       {bg:'#FFF7ED', dot:'#EA580C', text:'#7C2D12'},
+};
+
+const RTD_FAM_COLORS = {
+  'Macro Ill XRO':  {bg:'#FFF4E6',dot:'#F59E0B',text:'#92400E'},
+  'Macrolock':      {bg:'#F0FDF4',dot:'#16A34A',text:'#14532D'},
+  'Macro Oval':     {bg:'#F5F3FF',dot:'#7C3AED',text:'#4C1D95'},
+  'Matchpost':      {bg:'#FFF1F2',dot:'#E11D48',text:'#881337'},
+  'DT Light':       {bg:'#EFF6FF',dot:'#3B82F6',text:'#1E3A8A'},
+  'DT Ill XRO':     {bg:'#F0FFFE',dot:'#0891B2',text:'#164E63'},
+  'Endo':           {bg:'#FDF4FF',dot:'#A855F7',text:'#581C87'},
+  'NTI':            {bg:'#ECFDF5',dot:'#10B981',text:'#064E3B'},
+  'DRILL DT':       {bg:'#FEF3C7',dot:'#D97706',text:'#78350F'},
+};
+
+let pdpSelectedClient = null;
+let pdpSearchFilter = '';
+let pdpNavCollapsed = false; // replie le bandeau clients/familles (utile sur petit écran)
+let _pdpSearchTimer = null;
+let pdpCustomNames = {};
+let pdpCustomOrder = {};
+let pdpDeletedRefs = []; // codes clients supprimés définitivement
+let byClientGlobal = {};
+let byFamilleGlobal = {};
+
+// Clic délégué sur les tuiles et boutons PDP (évite les soucis d'apostrophes en onclick inline)
+document.addEventListener('click', function(e) {
+  const actionBtn = e.target.closest('[data-pdp-action]');
+  if (actionBtn) {
+    e.stopPropagation();
+    const action = actionBtn.getAttribute('data-pdp-action');
+    const arg = actionBtn.getAttribute('data-pdp-arg');
+    if (action === 'rename') pdpRenameRef(arg);
+    else if (action === 'delete') pdpDeleteRef(arg);
+    else if (action === 'moveup') pdpMoveRef(arg, -1);
+    else if (action === 'movedown') pdpMoveRef(arg, 1);
+    else if (action === 'goto-stock') pdpGotoStock(arg);
+    else if (action === 'show-detail') pdpShowDetail(arg);
+    else if (action === 'open-of') { if(typeof openOf==='function') openOf(arg); else if(typeof openDetail==='function') openDetail(arg); }
+    return;
+  }
+  const card = e.target.closest('[data-pdp-key]');
+  if (card) {
+    const key = card.getAttribute('data-pdp-key');
+    pdpSelectClient(key || null);
+  }
+});
+
+
+
+
+// ── pdpFindNomenclature ───────────────────────────────────────────────────────
+// Retrouve la nomenclature d'UNE référence précise.
+// IMPORTANT : plusieurs FG distincts (ex. boîte de 10 / boîte de 5) peuvent partager
+// le même codart_wip en tête de chaîne (même tenon amont, conditionnement différent).
+// On doit donc matcher en PRIORITÉ sur le FG (code_client, unique), qui apparaît en
+// dernière étape (ratio === null) de la nomenclature. On ne retombe sur codart_wip
+// que pour les références sans nomenclature multi-niveaux dédiée.
+function pdpFindNomenclature(codart_wip, code_client) {
+  if (typeof nomenclatures === 'undefined') return null;
+  if (code_client) {
+    const byFG = (typeof findNomenclatureByFG === 'function') ? findNomenclatureByFG(code_client) : null;
+    if (byFG) return byFG;
+  }
+  return (typeof findNomenclatureByCodart === 'function') ? findNomenclatureByCodart(codart_wip) : null;
+}
+
+// Retrouve TOUTES les chaînes de nomenclature partageant ce code_client — la
+// plupart des références n'en ont qu'une (comportement identique à
+// pdpFindNomenclature), mais certaines (ex: 5010001, standard + Chine/BCHINE)
+// en ont plusieurs, stockées séparément dans `nomenclatures` avec le même champ
+// code_client explicite (voir pdpImportCorrespondances). Ajouté 14/08/2026.
+function pdpFindAllNomenclatures(codart_wip, code_client) {
+  if (typeof nomenclatures === 'undefined') return [];
+  const byField = code_client ? nomenclatures.filter(n => n.code_client === code_client) : [];
+  if (byField.length) return byField;
+  const single = pdpFindNomenclature(codart_wip, code_client);
+  return single ? [single] : [];
+}
+
+// Stock d'une étape, en respectant sa restriction de zone éventuelle (ex:
+// "BCHINE") — sinon le calcul général habituel (nomGetStock, ou zones client
+// dédié si fourni).
+function pdpStockForEtape(e, zones, i, blisterIdx, defaultStockFn) {
+  if (e.zoneRestrict) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, [e.zoneRestrict]) : 0;
+  if (zones && i === blisterIdx) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.blister) : 0;
+  if (zones && i > blisterIdx) return (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(e.codart, zones.fg) : 0;
+  // Fonction de repli fournie par l'appelant (comportement D'ORIGINE de CET
+  // appelant précis, avant l'ajout du support multi-chaînes) — ne pas figer sur
+  // nomGetStock ici : pdpGetTotalFGForRef utilisait pdpGetStockForWip directement,
+  // et remplacer par nomGetStock avait fait tomber tous les totaux à zéro pour
+  // Stéphane le 14/08/2026 (régression corrigée le jour même).
+  if (defaultStockFn) return defaultStockFn(e.codart);
+  return (typeof nomGetStock !== 'undefined') ? nomGetStock(e.codart) : 0;
+}
+
+// ── pdpGetTotalFGForRef ───────────────────────────────────────────────────────
+// Calcule le stock total FG équivalent pour une référence (tous niveaux de nomenclature).
+// Doit être définie AVANT renderPdpPage() qui l'utilise.
+function pdpGetTotalFGForRef(codart_wip, code_client) {
+  // Introkit : stock disponible = composant le plus rare, PAS une somme de
+  // niveaux de nomenclature (il n'y en a pas pour un kit) — voir
+  // pdpIntrokitStockDispo et sa doc plus haut. Court-circuite tout le reste
+  // de la fonction pour ces deux références.
+  if (typeof INTROKITS !== 'undefined' && INTROKITS[code_client]) {
+    return pdpIntrokitStockDispo(INTROKITS[code_client]);
+  }
+
+  const _stk = typeof pdpGetStockForWip === 'function' ? pdpGetStockForWip : () => 0;
+  const _enc = typeof pdpGetEnCoursForWip === 'function' ? pdpGetEnCoursForWip : () => 0;
+
+  const noms = pdpFindAllNomenclatures(codart_wip, code_client);
+
+  if (!noms.length) {
+    // Pas de nomenclature : stock du WIP brut uniquement. code_client est un numéro
+    // de référence commercial (utilisé côté commandes), PAS un code de stock ou de
+    // production — l'additionner en plus provoquait un double comptage dès que
+    // code_client différait textuellement de codart_wip (le cas quasi général pour
+    // les produits simples). pdpShowDetail (tuile PDP) ne fait jamais cette addition ;
+    // les deux calculs doivent rester alignés.
+    return _stk(codart_wip) + _enc(codart_wip);
+  }
+
+  // Une nomenclature n'existe que si etapes.length > 1 (voir import), donc pas besoin
+  // de distinguer un cas "produit simple" ici : la formule ci-dessous gère déjà
+  // correctement un ratio absent/vide en le traitant comme 1:1 (ex: chaîne AXIS
+  // tenon→blister vrac→blister fini, où chaque étape a un ratio de 1, pas de
+  // consolidation). Ne PAS ne garder que le stock du dernier niveau : ça ignorerait
+  // tout le stock amont (tenons, blisters vrac) qui n'a pas encore été transformé.
+
+  // Produit multi-niveaux → sommer les équivalents FG de chaque niveau, de CHAQUE
+  // chaîne (généralement une seule ; plusieurs pour un code FG partagé entre une
+  // chaîne standard et une chaîne dédiée comme BCHINE — voir pdpFindAllNomenclatures).
+  // IMPORTANT : le ratio cumulé jusqu'au FG, pas seulement celui de l'étape immédiate
+  // suivante — un tenon doit passer par TOUTES les conversions restantes (ex: 5 tenons
+  // → 1 blister, PUIS 2 blisters → 1 boîte FG = 10 tenons pour 1 FG, pas 5). Diviser
+  // seulement par le ratio immédiat sous-divisait les niveaux amont et gonflait le
+  // total (ex: 2053 affiché au lieu de 2012, le vrai total de la tuile PDP). Doit
+  // rester identique au calcul de pdpShowDetail ci-dessous.
+  // AUTRE PIÈGE : l'en-cours de production (_enc) ne doit être compté QU'AU PREMIER
+  // NIVEAU (le tenon brut) DE CHAQUE CHAÎNE. Un même lot de matière suivi comme "en
+  // cours" pendant sa transformation successive (tenon → jointé → blister) ne
+  // représente qu'UNE seule quantité physique — le compter à chaque étape où l'ERP
+  // le mentionne double (ou triple) artificiellement l'en-cours réel.
+  return noms.reduce((total, nom) => total + nom.etapes.reduce((s, e, i) => {
+    let cumRatio = 1;
+    for (let j = i; j < nom.etapes.length - 1; j++) {
+      if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
+    }
+    const stk = pdpStockForEtape(e, null, i, -1, _stk) + (i === 0 ? _enc(e.codart) : 0);
+    return s + (cumRatio > 1 ? Math.floor(stk / cumRatio) : stk);
+  }, 0), 0);
+}
+
+// Identique à pdpGetTotalFGForRef, mais restreint le stock compté à des zones
+// d'entrepôt dédiées par client (voir CLIENT_STOCK_ZONES / pdpGetZonesForClient,
+// index.html), À PARTIR DU BLISTER UNIQUEMENT — le tenon brut et toute étape de
+// transformation avant le blister (ex: "tenon jointé") restent comptés sur tout
+// le parc, sans restriction. La zone peut différer entre le niveau BLISTER
+// lui-même (zones.blister) et les niveaux suivants, FG inclus (zones.fg) — ex:
+// Chaoran a ses blisters dans BSRTD1 mais son FG dans BCHINE.
+function pdpGetTotalFGForRefZoned(codart_wip, code_client, zones) {
+  if (!zones || !zones.blister || !zones.fg) return pdpGetTotalFGForRef(codart_wip, code_client);
+
+  const _stkFull = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip : () => 0;
+  const _stkZone = (c, z) => (typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(c, z) : 0;
+  const _enc = (typeof pdpGetEnCoursForWip === 'function') ? pdpGetEnCoursForWip : () => 0;
+
+  const noms = pdpFindAllNomenclatures(codart_wip, code_client);
+  if (!noms.length) {
+    // Produit simple (pas de nomenclature) : on considère qu'il s'agit déjà du
+    // niveau FG, donc la zone FG s'applique.
+    return _stkZone(codart_wip, zones.fg) + _enc(codart_wip);
+  }
+
+  // Repérer la première étape "blister" (par son libellé ou son code), sur la
+  // 1ère chaîne (la "standard") : c'est à partir de là que la restriction de
+  // zone client s'applique. Si aucune étape ne semble être un blister (chaîne
+  // courte type tenon→FG direct), on applique la restriction (zone FG) à tout
+  // sauf le tout premier niveau (le tenon brut).
+  let blisterIdx = noms[0].etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
+  if (blisterIdx < 0) blisterIdx = 1;
+
+  // Sommer sur toutes les chaînes (généralement une seule ; plusieurs pour un
+  // code FG partagé entre chaîne standard et chaîne dédiée comme BCHINE — voir
+  // pdpFindAllNomenclatures). La restriction de zone PAR ÉTAPE (zoneRestrict,
+  // ex: BCHINE) prime toujours sur la restriction de zone CLIENT ci-dessous
+  // (gérée par pdpStockForEtape).
+  return noms.reduce((total, nom, chainIdx) => total + nom.etapes.reduce((s, e, i) => {
+    let cumRatio = 1;
+    for (let j = i; j < nom.etapes.length - 1; j++) {
+      if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
+    }
+    const stk = pdpStockForEtape(e, zones, i, chainIdx === 0 ? blisterIdx : -1, _stkFull) + (i === 0 ? _enc(e.codart) : 0);
+    return s + (cumRatio > 1 ? Math.floor(stk / cumRatio) : stk);
+  }, 0), 0);
+}
+
+function renderPdpPage() {
+  const el = document.getElementById('view-pdp');
+  if (!el) return;
+
+  // Grouper : OEM par client, RTD par famille
+  const byClient = {};
+  const byFamille = {};
+  byClientGlobal = byClient;
+  byFamilleGlobal = byFamille;
+  pdpGetActiveCorrespondances().forEach(c => {
+    if (c.client === 'RTD' && c.famille && c.famille !== 'RTD') {
+      byFamille[c.famille] = byFamille[c.famille] || [];
+      byFamille[c.famille].push(c);
+    } else {
+      byClient[c.client] = byClient[c.client] || [];
+      byClient[c.client].push(c);
+    }
+  });
+  const clients = Object.keys(byClient).sort();
+  const familles = Object.keys(byFamille).sort();
+
+  const hasData = (pcData.stock||[]).length > 0 || (pcData.ofEnCours||[]).length > 0;
+
+  // Filtrer les refs selon recherche
+  const search = pdpSearchFilter.toLowerCase();
+
+  // ── Sélecteur de clients (tabs)
+  function makeTab(key, count, dict, prefix) {
+    const col = dict[key] || {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
+    const isSel = pdpSelectedClient === prefix+key;
+    return '<button data-pdp-key="' + prefix+key + '" style="'
+      +'display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:var(--radius);'
+      +'border:1.5px solid ' + (isSel ? col.dot : 'var(--border)') + ';'
+      +'background:' + (isSel ? col.bg : 'var(--surface)') + ';'
+      +'color:' + (isSel ? col.text : 'var(--text-muted)') + ';'
+      +'font-size:11px;font-weight:' + (isSel ? '700' : '500') + ';cursor:pointer;'
+      +'font-family:var(--font);transition:all .15s;white-space:nowrap">'
+      +'<span style="width:7px;height:7px;border-radius:50%;background:' + col.dot + ';flex-shrink:0"></span>'
+      + key
+      +'<span style="font-size:9px;background:' + (isSel?col.dot:'var(--border-med)') + ';color:' + (isSel?'#fff':'var(--text-faint)') + ';padding:1px 5px;border-radius:20px">' + count + '</span>'
+      +'</button>';
+  }
+  const clientTabs =
+    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+    +'<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);white-space:nowrap">Clients</span>'
+    +clients.map(cl => makeTab(cl, byClient[cl].length, PDP_CLIENT_COLORS, '')).join('')
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px">'
+    +'<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);white-space:nowrap">Familles RTD</span>'
+    +familles.map(f => makeTab(f, byFamille[f].length, RTD_FAM_COLORS, 'RTD_')).join('')
+    +'</div>';
+
+  // ── Contenu principal
+  let mainContent = '';
+
+  if (!pdpSelectedClient) {
+    // Vue d'ensemble : tous les clients, cartes KPI
+    mainContent = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">';
+    clients.forEach(cl => {
+      const col = PDP_CLIENT_COLORS[cl] || {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
+      const refs = byClient[cl];
+      let totalStock=0, totalCdes=0;
+      refs.forEach(r => {
+        try {
+          totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+          totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+        } catch (err) {
+          // Une référence mal formée ne doit pas faire planter tout le total du
+          // client (et par ricochet, comme forEach s'arrête sur une exception,
+          // tous les clients suivants dans la boucle englobante) — voir le même
+          // correctif dans renderGridBody/renderTile.
+          console.error('[PDP] Erreur de calcul stock pour', r.code_client, ':', err);
+        }
+      });
+      const solde = totalStock - totalCdes;
+      const soldeOk = solde >= 0;
+
+      mainContent +=
+        '<div data-pdp-key="' + cl + '" style="'
+        +'background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);'
+        +'padding:16px;cursor:pointer;transition:all .15s;border-top:3px solid '+col.dot+'"'
+        +' onmouseenter="this.style.borderColor=\''+col.dot+'\';this.style.background=\''+col.bg+'\'"'
+        +' onmouseleave="this.style.borderColor=\'var(--border)\';this.style.borderTopColor=\''+col.dot+'\';this.style.background=\'var(--surface)\'">'
+        // Header client
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+        +'<span style="font-size:13px;font-weight:700;color:'+col.text+';flex:1">'+cl+'</span>'
+        +'<span style="font-size:10px;color:var(--text-faint);background:var(--bg);padding:2px 7px;border-radius:20px">'+refs.length+' réf.</span>'
+        +'</div>'
+        // KPIs
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+        +'<div style="background:var(--bg);border-radius:6px;padding:8px 10px">'
+        +'<div style="font-size:10px;color:var(--text-faint);margin-bottom:2px">Stock + en cours</div>'
+        +'<div style="font-size:16px;font-weight:700;color:'+col.text+'">'+totalStock.toLocaleString('fr')+'</div>'
+        +'</div>'
+        +'<div style="background:var(--bg);border-radius:6px;padding:8px 10px">'
+        +'<div style="font-size:10px;color:var(--text-faint);margin-bottom:2px">Commandes</div>'
+        +'<div style="font-size:16px;font-weight:700;color:#A32D2D">'+totalCdes.toLocaleString('fr')+'</div>'
+        +'</div>'
+        +'</div>'
+        // Solde
+        +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;'
+        +'background:'+(soldeOk?'#EAF3DE':'#FCEBEB')+';border-radius:6px">'
+        +'<span style="font-size:11px;color:'+(soldeOk?'#27500A':'#A32D2D')+';">'+(soldeOk?'✓ Couvert':'✗ Insuffisant')+'</span>'
+        +'<span style="font-size:14px;font-weight:700;color:'+(soldeOk?'#27500A':'#A32D2D')+'">'+solde.toLocaleString('fr')+'</span>'
+        +'</div>'
+        +pdpCovBar(totalStock,totalCdes)
+        +'</div>';
+    });
+    mainContent += '</div>';
+
+    // Section familles RTD
+    if (familles.length > 0) {
+      mainContent += '<div style="margin-top:20px;margin-bottom:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)">Familles produits RTD</div>';
+      mainContent += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
+      familles.forEach(f => {
+        const col = RTD_FAM_COLORS[f] || {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
+        const refs = byFamille[f];
+        let totalStock=0, totalCdes=0;
+        refs.forEach(r => {
+          try {
+            totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+            totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+          } catch (err) {
+            console.error('[PDP] Erreur de calcul stock pour', r.code_client, ':', err);
+          }
+        });
+        const solde = totalStock - totalCdes;
+        const ok = solde >= 0;
+        mainContent +=
+          '<div data-pdp-key="RTD_' + f + '" style="'
+          +'background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);'
+          +'padding:12px 14px;cursor:pointer;transition:all .15s;border-top:3px solid '+col.dot+'">'
+          +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
+          +'<span style="font-size:12px;font-weight:700;color:'+col.text+';flex:1">'+f+'</span>'
+          +'<span style="font-size:9px;color:var(--text-faint);background:var(--bg);padding:1px 6px;border-radius:20px">'+refs.length+' réf.</span>'
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:6px">'
+          +'<span>Stock <strong style="color:'+col.text+'">'+totalStock.toLocaleString('fr')+'</strong></span>'
+          +'<span>Cdes <strong style="color:#A32D2D">'+totalCdes.toLocaleString('fr')+'</strong></span>'
+          +'</div>'
+          +'<div style="padding:5px 10px;background:'+(ok?'#EAF3DE':'#FCEBEB')+';border-radius:6px;text-align:center">'
+          +'<span style="font-size:12px;font-weight:700;color:'+(ok?'#27500A':'#A32D2D')+'">'+(ok?'✓ ':'✗ ')+solde.toLocaleString('fr')+'</span>'
+          +'</div></div>';
+      });
+      mainContent += '</div>';
+    }
+
+    if (!hasData) {
+      mainContent += '<div style="margin-top:16px;padding:16px;background:var(--bg);border:1px dashed var(--border-med);border-radius:var(--radius);font-size:12px;color:var(--text-faint);text-align:center">'
+        +'<i class="ti ti-upload" style="font-size:24px;display:block;margin-bottom:6px"></i>'
+        +'Importez vos fichiers ERP depuis l\'onglet Stock & Commandes pour voir les niveaux de stock</div>';
+    }
+
+  } else {
+    // Vue client sélectionné
+    const isRTDFam2 = pdpSelectedClient && pdpSelectedClient.startsWith('RTD_');
+    const lookupKey2 = isRTDFam2 ? pdpSelectedClient.slice(4) : pdpSelectedClient;
+    const colDict2 = isRTDFam2 ? RTD_FAM_COLORS : PDP_CLIENT_COLORS;
+    const col = colDict2[lookupKey2] || PDP_CLIENT_COLORS[pdpSelectedClient] || {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
+    const sourcePool = isRTDFam2 ? (byFamille[lookupKey2]||[]) : (byClient[pdpSelectedClient]||[]);
+    byClientGlobal = byClient; byFamilleGlobal = byFamille;
+    const refsRaw = sourcePool.map((r, i) => Object.assign({}, r, {
+      _shortName: pdpCustomNames[r.code_client] || null,
+      _order: pdpCustomOrder[pdpSelectedClient]
+        ? pdpCustomOrder[pdpSelectedClient].indexOf(r.code_client)
+        : i,
+    }));
+    const refs = refsRaw.filter(r =>
+      !search || (r._shortName||r.libelle_fg).toLowerCase().includes(search)
+        || r.code_client.toLowerCase().includes(search)
+        || r.codart_wip.toLowerCase().includes(search)
+    );
+
+    // Totaux client
+    let totalStock=0, totalCdes=0;
+    refs.forEach(r => {
+      try {
+        totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+        totalCdes    += pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+      } catch (err) {
+        console.error('[PDP] Erreur de calcul stock pour', r.code_client, ':', err);
+      }
+    });
+
+    // KPIs client
+    mainContent +=
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'
+      +'<div style="background:'+col.bg+';border:1px solid '+col.dot+'22;border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px">'
+      +'<div style="font-size:10px;color:'+col.text+';font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Références</div>'
+      +'<div style="font-size:22px;font-weight:700;color:'+col.text+'">'+refs.length+'</div></div>'
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px">'
+      +'<div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Stock disponible</div>'
+      +'<div style="font-size:22px;font-weight:700;color:#185FA5">'+totalStock.toLocaleString('fr')+'</div></div>'
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px">'
+      +'<div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">En production</div>'
+      +'<div style="font-size:22px;font-weight:700;color:#D4880A">'+((typeof ofs!=='undefined'?ofs.filter(o=>refs.some(r=>pdpGetOFsForRef(r.codart_wip,pdpAutoShortName(r)).some(x=>x.id===o.id))).reduce((s,o)=>s+(o.qty||0),0):0)+(typeof foretsGetOFsForRef==='function'?refs.reduce((s,r)=>s+foretsGetOFsForRef(r.codart_wip).reduce((s2,o)=>s2+(o.qty||0),0),0):0)).toLocaleString('fr')+'</div></div>'
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;flex:1;min-width:120px">'
+      +'<div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Commandes</div>'
+      +'<div style="font-size:22px;font-weight:700;color:#A32D2D">'+totalCdes.toLocaleString('fr')+'</div></div>'
+      +'</div>';
+
+    // Grille de cartes références
+    // Tri : par ordre personnalisé si défini, sinon libelle_fg
+    const sortedRefs = [...refs].sort((a,b) => {
+      if (a._order !== undefined && b._order !== undefined) return a._order - b._order;
+      return (a._shortName||a.libelle_fg).localeCompare(b._shortName||b.libelle_fg);
+    });
+
+    // Fonction de rendu d'une tuile individuelle (comportement inchangé) — extraite
+    // pour être réutilisable telle quelle par les références "isolées" (aucune autre
+    // ref ne partage leur codart_wip de départ).
+    function renderTile(r) {
+      const introkit = (typeof INTROKITS !== 'undefined') ? INTROKITS[r.code_client] : null;
+      const noms = introkit ? [] : pdpFindAllNomenclatures(r.codart_wip, r.code_client);
+
+      // Calculer les niveaux avec conversion en FG
+      let levels = [];
+      if (introkit) {
+        // Un "niveau" par composant du kit — fgEquiv devient ici "nombre de
+        // kits que permet ce composant seul", pour visualiser directement
+        // lequel est le goulot d'étranglement (barre la plus courte).
+        levels = introkit.composants.map(c => {
+          const stk = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip(c.codart) : 0;
+          const kitsPossibles = Math.floor((stk || 0) / (c.qte || 1));
+          return { label: c.label, codart: c.codart, stk, enc: 0, total: stk, fgEquiv: kitsPossibles, isFG: false, cumRatio: c.qte };
+        });
+      } else if (noms.length) {
+        noms.forEach((nom, chainIdx) => {
+          const etapes = (nom && Array.isArray(nom.etapes)) ? nom.etapes : [];
+          etapes.forEach((e, i) => {
+            // Ratio cumulatif : produit des ratios de l'étape i jusqu'à la fin DE CETTE CHAÎNE
+            let cumRatio = 1;
+            for (let j = i; j < etapes.length - 1; j++) {
+              if (etapes[j].ratio) cumRatio *= etapes[j].ratio;
+            }
+            const stk = pdpStockForEtape(e, null, i, -1);
+            const enc = (i === 0 && typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
+            levels.push({
+              label: e.label, codart: e.codart,
+              stk, enc,
+              total: stk + enc,
+              fgEquiv: cumRatio > 1 ? Math.floor((stk + enc) / cumRatio) : (stk + enc),
+              isFG: e.ratio === null,
+              cumRatio,
+            });
+          });
+        });
+      } else {
+        totalStock   += pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+        const stk = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip(r.codart_wip) : 0;
+        const enc = (typeof pdpGetEnCoursForWip === 'function') ? pdpGetEnCoursForWip(r.codart_wip) : 0;
+        levels = [{label: r.codart_wip, codart: r.codart_wip, stk, enc, total: stk+enc, fgEquiv: stk+enc, isFG: false, cumRatio: 1}];
+      }
+
+      // Total FG = somme des équivalents FG de chaque niveau — SAUF pour un
+      // introkit, où c'est le composant le plus rare qui limite (min, pas
+      // somme), voir pdpIntrokitStockDispo.
+      const totalFG = introkit
+        ? (levels.length ? Math.min(...levels.map(l => l.fgEquiv)) : 0)
+        : levels.reduce((s,l) => s + l.fgEquiv, 0);
+      const cde = pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+      const solde = totalFG - cde;
+      const ok = solde >= 0;
+      const barMax = Math.max(levels.reduce((s,l)=>Math.max(s,l.fgEquiv),0), cde, 1);
+      const COLORS = ['#4C8EDA','#1D9E75','#D4880A','#7C3AED'];
+      const rupture = pdpCalcRupture(r.code_client, totalFG);
+
+      // Nom personnalisé > nom court auto-détecté (W0, W1, K101...) > libellé complet
+      const autoShort = pdpAutoShortName(r);
+      const displayName = r._shortName || autoShort;
+      const ofsEnCours = pdpGetOFsForRef(r.codart_wip, autoShort)
+        .concat(typeof foretsGetOFsForRef === 'function' ? foretsGetOFsForRef(r.codart_wip) : []);
+
+      return '<div data-pdp-action="show-detail" data-pdp-arg="' + r.code_client + '" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;transition:box-shadow .15s;display:flex;flex-direction:column;gap:8px;cursor:pointer"'
+        +' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\'" onmouseleave="this.style.boxShadow=\'none\'">'
+
+        // En-tête : nom + code + badge total FG + bouton édition
+        +'<div style="display:flex;align-items:flex-start;gap:8px">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<span style="font-size:17px;font-weight:700;color:'+col.text+'">'+displayName+'</span>'
+        +'<button data-pdp-action="rename" data-pdp-arg="'+r.code_client+'" title="Renommer" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-faint);font-size:12px;line-height:1"><i class="ti ti-pencil"></i></button>'
+        +'<button data-pdp-action="moveup" data-pdp-arg="'+r.code_client+'" title="Monter" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-faint);font-size:12px;line-height:1"><i class="ti ti-arrow-up"></i></button>'
+        +'<button data-pdp-action="movedown" data-pdp-arg="'+r.code_client+'" title="Descendre" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-faint);font-size:12px;line-height:1"><i class="ti ti-arrow-down"></i></button>'
+        +'<button data-pdp-action="delete" data-pdp-arg="'+r.code_client+'" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#A32D2D;font-size:12px;padding:2px;opacity:.7"><i class="ti ti-trash"></i></button>'
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--text-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+r.libelle_fg+'">'+r.libelle_fg+'</div>'
+        +'</div>'
+        +'<span style="font-size:13px;font-weight:700;padding:4px 10px;border-radius:20px;flex-shrink:0;'
+        +'background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+'">'
+        +(ok?'\u2713 ':'\u2717 ')+totalFG.toLocaleString('fr')+' FG</span>'
+        +'</div>'
+
+        // Barres par niveau (en équivalent FG)
+        +'<div style="display:flex;flex-direction:column;gap:3px">'
+        +levels.map((lv, i) => {
+          if (lv.total === 0) return '';
+          const pct = Math.round(lv.fgEquiv / barMax * 100);
+          const color = lv.isFG ? '#7C3AED' : COLORS[Math.min(i, COLORS.length-1)];
+          const lbl = lv.label.length > 18 ? lv.label.slice(0,18)+'\u2026' : lv.label;
+          const tooltip = lv.cumRatio > 1
+            ? lv.total.toLocaleString('fr')+' \u00F7 '+lv.cumRatio+' = '+lv.fgEquiv.toLocaleString('fr')+' FG'
+            : lv.total.toLocaleString('fr')+' FG';
+          return '<div style="display:flex;align-items:center;gap:6px" title="'+tooltip+'">'
+            +'<span style="font-size:9px;color:var(--text-faint);width:72px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lbl+'</span>'
+            +'<div style="flex:1;height:10px;background:var(--bg);border-radius:5px;overflow:hidden">'
+            +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:5px;min-width:'+(lv.total>0?'2':'0')+'px"></div></div>'
+            +'<span style="font-size:10px;font-weight:600;color:'+color+';width:52px;text-align:right;flex-shrink:0">'+lv.fgEquiv.toLocaleString('fr')+' FG</span>'
+            +'</div>';
+        }).join('')
+        +(cde>0
+          ? '<div style="display:flex;align-items:center;gap:6px;margin-top:3px;padding-top:4px;border-top:1px dashed var(--border-med)">'
+            +'<span style="font-size:9px;color:#A32D2D;width:72px;flex-shrink:0">Commandes</span>'
+            +'<div style="flex:1;height:10px;background:#FEE2E2;border-radius:5px;overflow:hidden">'
+            +'<div style="height:100%;width:'+Math.round(cde/barMax*100)+'%;background:#F87171;border-radius:5px"></div></div>'
+            +'<span style="font-size:10px;font-weight:600;color:#A32D2D;width:52px;text-align:right">'+cde.toLocaleString('fr')+' FG</span>'
+            +'</div>'
+          : '')
+        +'</div>'
+
+        // Mini bandeau résumé (cliquer sur la carte ouvre le détail complet)
+        +'<div style="display:flex;align-items:center;gap:8px;margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">'
+        +'<span style="font-size:10px;color:var(--text-faint)">Stock <strong style="color:'+col.text+'">'+totalFG.toLocaleString('fr')+'</strong></span>'
+        +'<span style="font-size:10px;color:var(--text-faint)">\u00B7</span>'
+        +'<span style="font-size:10px;color:var(--text-faint)">Cdes <strong style="color:#A32D2D">'+cde.toLocaleString('fr')+'</strong></span>'
+        +(rupture
+          ? '<span style="margin-left:auto;font-size:10px;font-weight:700;color:#A32D2D;background:#FCEBEB;padding:2px 8px;border-radius:20px;white-space:nowrap"><i class="ti ti-alert-triangle" style="font-size:10px;vertical-align:-1px"></i> '+pdpFmtDate(rupture.date)+'</span>'
+          : '<span style="margin-left:auto;font-size:10px;font-weight:600;color:#27500A;background:#EAF3DE;padding:2px 8px;border-radius:20px;white-space:nowrap">\u2713 Couvert</span>')
+        +'</div>'
+
+        // À produire pour reconstituer PDP_MOIS_STOCK_CIBLE mois de stock cible,
+        // en plus des commandes déjà en carnet — voir pdpQtyAProduire. Masqué si
+        // pas de consommation moyenne connue pour cette référence (pas de "—"
+        // inutile qui alourdirait toutes les tuiles sans donnée de vente).
+        +(() => {
+          const aProduire = pdpQtyAProduire(r.code_client, totalFG, cde);
+          if (aProduire === null) return '';
+          return '<div style="display:flex;align-items:center;gap:6px;padding-top:2px">'
+            +'<span style="font-size:10px;color:var(--text-faint)">À produire ('+PDP_MOIS_STOCK_CIBLE+' mois)</span>'
+            +'<span style="margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;background:'+(aProduire>0?'#FFF4E6':'#EAF3DE')+';color:'+(aProduire>0?'#92400E':'#27500A')+'">'+aProduire.toLocaleString('fr')+'</span>'
+            +'</div>';
+        })()
+
+        // OFs en cours sur cette référence (Kanban)
+        +(ofsEnCours.length > 0
+          ? '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:6px">'
+            +'<span style="font-size:9px;color:var(--text-faint);white-space:nowrap"><i class="ti ti-tool" style="font-size:10px;vertical-align:-1px"></i> En prod</span>'
+            +ofsEnCours.slice(0,3).map(o => {
+              const dl = o.deadline ? pdpFmtDate(o.deadline.slice(0,10)) : null;
+              const isLate = o.deadline && new Date(o.deadline) < new Date();
+              return '<button data-pdp-action="open-of" data-pdp-arg="'+o.id+'"'
+                +' style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;background:#FFF4E6;color:#92400E;border:none;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px"'
+                +' title="'+o.id+' — '+o.produit+' ('+o.qty.toLocaleString('fr')+' u.) — '+o.stage+'">'
+                +o.id.replace('OF-','')+' · '+Math.round(o.qty/1000)+'k'
+                +(dl ? ' <span style="font-size:8px;color:'+(isLate?'#A32D2D':'#27500A')+'">'+dl+'</span>' : '')
+                +'</button>';
+            }).join('')
+            +(ofsEnCours.length > 3 ? '<span style="font-size:9px;color:var(--text-faint)">+'+(ofsEnCours.length-3)+'</span>' : '')
+            +'</div>'
+          : '')
+
+        +'</div>';
+    }
+
+    // Rendu d'une carte "famille" groupant plusieurs FG qui partagent le même WIP de
+    // départ (ex: boîte de 10 / boîte de 5 d'un même tenon) : le tronc commun (tenon,
+    // blister...) n'est affiché QU'UNE FOIS en stock brut, puis une branche par FG
+    // avec son propre stock équivalent FG, ses commandes et sa couverture — plutôt
+    // que plusieurs tuiles qui répètent les mêmes niveaux avec des chiffres qui ne
+    // sont que la même matière convertie différemment selon le ratio de chaque FG.
+    function renderFamilyGroup(group) {
+      const nomsMembres = group.map(r => pdpFindNomenclature(r.codart_wip, r.code_client));
+      if (nomsMembres.some(n => !n)) return group.map(renderTile).join('');
+
+      // Tronc commun : indices où TOUS les membres ont le même codart, sans jamais
+      // inclure le dernier niveau de chacun (toujours propre à son FG).
+      const minLen = Math.min(...nomsMembres.map(n => n.etapes.length));
+      let trunkLen = 0;
+      for (let i = 0; i < minLen - 1; i++) {
+        const codarts = nomsMembres.map(n => n.etapes[i].codart);
+        if (codarts.every(c => c === codarts[0])) trunkLen++;
+        else break;
+      }
+      if (trunkLen === 0) return group.map(renderTile).join('');
+
+      const trunkEtapes = nomsMembres[0].etapes.slice(0, trunkLen);
+      const famLabel = group[0].famille || group[0].libelle_fg;
+
+      const trunkHtml = trunkEtapes.map((e, i) => {
+        const stk = (typeof nomGetStock === 'function') ? nomGetStock(e.codart) : 0;
+        const enc = (i === 0 && typeof nomGetEnCours === 'function') ? nomGetEnCours(e.codart) : 0;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:var(--radius);margin-bottom:6px">'
+          + '<i class="ti ti-circle-dot" style="font-size:14px;color:'+col.text+'"></i>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:12px;font-weight:500">'+e.label+'</div>'
+          + '<div style="font-size:9px;color:var(--text-faint);font-family:monospace">'+e.codart+'</div>'
+          + '</div>'
+          + '<span style="font-size:14px;font-weight:700">'+(stk+enc).toLocaleString('fr')+'</span>'
+          + '</div>';
+      }).join('');
+
+      const branchesHtml = group.map(r => {
+        const totalFG = pdpGetTotalFGForRef(r.codart_wip, r.code_client);
+        const cde = pdpGetCommandesForRef(pdpResolveFG(r.codart_wip, r.code_client));
+        const ok = (totalFG - cde) >= 0;
+        const rupture = pdpCalcRupture(r.code_client, totalFG);
+        const aProduire = pdpQtyAProduire(r.code_client, totalFG, cde);
+        const displayName = r._shortName || pdpAutoShortName(r);
+        return '<div data-pdp-action="show-detail" data-pdp-arg="'+r.code_client+'" style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;background:var(--surface)"'
+          + ' onmouseenter="this.style.borderColor=\''+col.dot+'\'" onmouseleave="this.style.borderColor=\'var(--border)\'">'
+          + '<div style="font-size:13px;font-weight:700;color:'+col.text+'">'+displayName+'</div>'
+          + '<div style="font-size:9px;color:var(--text-faint);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+r.libelle_fg+'">'+r.libelle_fg+'</div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:var(--text-faint)">Stock FG</span><strong>'+totalFG.toLocaleString('fr')+'</strong></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:'+(aProduire!==null?'2':'8')+'px"><span style="color:var(--text-faint)">Commandé</span><strong style="color:#A32D2D">'+cde.toLocaleString('fr')+'</strong></div>'
+          + (aProduire !== null
+            ? '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px"><span style="color:var(--text-faint)">À produire ('+PDP_MOIS_STOCK_CIBLE+' mois)</span><strong style="color:'+(aProduire>0?'#92400E':'#27500A')+'">'+aProduire.toLocaleString('fr')+'</strong></div>'
+            : '')
+          + (rupture
+            ? '<span style="font-size:10px;font-weight:700;color:#A32D2D;background:#FCEBEB;padding:2px 8px;border-radius:20px"><i class="ti ti-alert-triangle" style="font-size:10px;vertical-align:-1px"></i> '+pdpFmtDate(rupture.date)+'</span>'
+            : '<span style="font-size:10px;font-weight:600;color:#27500A;background:#EAF3DE;padding:2px 8px;border-radius:20px">\u2713 Couvert</span>')
+          + '</div>';
+      }).join('');
+
+      return '<div style="grid-column:1/-1;background:var(--surface);border:1.5px solid var(--border);border-top:3px solid '+col.dot+';border-radius:var(--radius);padding:14px">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+        + '<span style="font-size:13px;font-weight:700;color:'+col.text+'">'+famLabel+'</span>'
+        + '<span style="font-size:10px;color:var(--text-faint);background:var(--bg);padding:2px 7px;border-radius:20px">'+group.length+' FG \u00B7 tenon commun</span>'
+        + '</div>'
+        + trunkHtml
+        + '<div style="display:flex;justify-content:center;padding:2px 0 8px"><i class="ti ti-corner-down-right" style="font-size:14px;color:var(--text-faint);transform:rotate(90deg) scaleX(-1)"></i></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'
+        + branchesHtml
+        + '</div></div>';
+    }
+
+    // Regrouper par codart_wip de départ : les groupes de 2+ partagent le même tenon
+    // (ou point de départ WIP) et sont donc de bons candidats pour la carte famille.
+    const groupsByWip = {};
+    sortedRefs.forEach(r => {
+      (groupsByWip[r.codart_wip] = groupsByWip[r.codart_wip] || []).push(r);
+    });
+
+    // Rend une liste de refs (déjà triées) en grille de cartes, en respectant les
+    // regroupements famille (tenon commun). Séparé de renderRefsGrid ci-dessous
+    // pour être réutilisable par section de catégorie.
+    function renderGridBody(list, groupsMap) {
+      let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">';
+      const seen = new Set();
+      list.forEach(r => {
+        if (seen.has(r.code_client)) return;
+        const group = groupsMap[r.codart_wip];
+        try {
+          if (group.length > 1) {
+            group.forEach(g => seen.add(g.code_client));
+            html += renderFamilyGroup(group);
+          } else {
+            seen.add(r.code_client);
+            html += renderTile(r);
+          }
+        } catch (err) {
+          // Une référence mal formée ne doit jamais faire disparaître tout le
+          // reste de la grille — isolé après le signalement de Stéphane
+          // (14-15/08/2026) : tout le stock de l'onglet PDP disparaissait après
+          // le rafraîchissement automatique, symptôme d'une exception non
+          // gérée dans le rendu d'une seule tuile qui interrompait toute la boucle.
+          console.error('[PDP] Erreur de rendu pour la référence', r.code_client, ':', err);
+          seen.add(r.code_client);
+          html += '<div style="background:var(--surface);border:1px solid #A32D2D;border-radius:var(--radius);padding:12px 14px;color:#A32D2D;font-size:12px">'
+            + '<i class="ti ti-alert-triangle" style="margin-right:6px"></i>Erreur d\'affichage : ' + r.code_client
+            + '</div>';
+        }
+      });
+      return html + '</div>';
+    }
+
+    // Sépare tenons standards / 3D / forets sous des intertitres — seulement
+    // quand le client mélange au moins deux catégories (ex: 3M), pour ne pas
+    // ajouter de titres inutiles à une famille RTD déjà homogène (ex: DRILLS).
+    // Un groupe famille (tenon commun) est affecté à UNE SEULE catégorie (celle
+    // de son premier membre) pour ne jamais le couper ou le dupliquer entre
+    // deux sections.
+    function renderRefsGrid(list, groupsMap) {
+      const cats = { standard: [], '3d': [], drill: [], introkit: [] };
+      const seenGroup = new Set();
+      list.forEach(r => {
+        if (seenGroup.has(r.code_client)) return;
+        const group = groupsMap[r.codart_wip];
+        const cat = pdpCategoryOf(r); // catégorie du groupe entier = celle du premier membre rencontré
+        if (group.length > 1) group.forEach(g => seenGroup.add(g.code_client));
+        else seenGroup.add(r.code_client);
+        cats[cat].push(r);
+      });
+      const present = Object.keys(cats).filter(k => cats[k].length);
+      if (present.length <= 1) return renderGridBody(list, groupsMap);
+
+      return ['standard', '3d', 'drill', 'introkit'].filter(k => cats[k].length).map(k =>
+        '<div style="margin:18px 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">'
+        + PDP_CATEGORY_LABELS[k] + ' <span style="font-weight:500;color:var(--text-faint)">(' + cats[k].length + ')</span></div>'
+        + renderGridBody(cats[k], groupsMap)
+      ).join('');
+    }
+
+    mainContent += renderRefsGrid(sortedRefs, groupsByWip);
+    if (!refs.length) {
+      mainContent = '<div style="text-align:center;padding:40px;color:var(--text-faint)"><i class="ti ti-search" style="font-size:28px;display:block;margin-bottom:8px"></i>Aucune référence trouvée</div>';
+    }
+  }
+
+  el.innerHTML =
+    '<div style="flex:1;overflow:hidden;display:flex;flex-direction:column">'
+
+    // Header
+    +'<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface)">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    +'<h2 style="font-size:17px;font-weight:600"><i class="ti ti-chart-bar" style="color:var(--accent);margin-right:8px;vertical-align:-3px"></i>Plan Directeur de Production</h2>'
+    +'<button onclick="pdpToggleNav()" title="'+(pdpNavCollapsed?'Afficher':'Replier')+' la liste clients/familles" style="background:none;border:1px solid var(--border-med);border-radius:var(--radius);cursor:pointer;color:var(--text-muted);padding:4px 8px;display:flex;align-items:center">'
+    +'<i class="ti ti-chevron-'+(pdpNavCollapsed?'down':'up')+'" style="font-size:14px"></i>'
+    +'</button>'
+    +(pdpSelectedClient
+      ? '<button class="btn" data-pdp-key="" style="font-size:11px;padding:4px 10px"><i class="ti ti-arrow-left"></i> Tous les clients</button>'
+      : '')
+    +'<label class="btn" style="margin-left:auto;font-size:11px;padding:4px 10px;cursor:pointer">'
+    +'<i class="ti ti-file-import"></i> '+(pdpImportedCorrespondances?'Réimporter':'Importer les correspondances')
+    +'<input type="file" accept=".xlsx,.xls" style="display:none" onchange="pdpImportCorrespondances(this)"></label>'
+    +(pdpImportedCorrespondances
+      ? '<span style="font-size:10px;color:#27500A;background:#EAF3DE;padding:3px 9px;border-radius:20px"><i class="ti ti-circle-check" style="vertical-align:-1px"></i> '+pdpGetActiveCorrespondances().length+' réf. · '+pdpLastImportDate+'</span>'
+      : '<span style="font-size:10px;color:var(--text-faint)">'+pdpGetActiveCorrespondances().length+' réf. par défaut</span>')
+    +'</div>'
+
+    +(pdpNavCollapsed ? '' :
+    // Tabs clients
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    +(pdpSelectedClient
+      ? '<button class="btn" onclick="pdpSortAZ()" style="font-size:11px;padding:5px 10px" title="Trier A \u2192 Z"><i class="ti ti-sort-a-z"></i></button>'
+        +'<button class="btn" onclick="pdpResetOrder()" style="font-size:11px;padding:5px 10px" title="Ordre par d\u00e9faut"><i class="ti ti-refresh"></i></button>'
+        +'<input id="pdp-search" placeholder="Filtrer les r\u00e9f\u00e9rences\u2026" value="'+pdpSearchFilter+'" oninput="pdpSearch(this.value)"'
+        +' style="padding:6px 10px;border:1px solid var(--border-med);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);outline:none;width:200px">'
+      : '<span style="font-size:11px;color:var(--text-faint)">Cliquez sur un client pour voir le d\u00e9tail</span>')
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
+    +clientTabs
+    +'</div>')
+    +'</div>'
+
+    // Contenu
+    +'<div style="flex:1;overflow-y:auto;padding:16px 20px">'
+    +mainContent
+    +'</div>'
+    +'</div>';
+}
+
+
+function pdpToggleNav() {
+  pdpNavCollapsed = !pdpNavCollapsed;
+  renderPdpPage();
+}
+
+function pdpSelectClient(client) {
+  pdpSelectedClient = client;
+  pdpSearchFilter = '';
+  renderPdpPage();
+}
+
+
+function pdpSearch(val) {
+  pdpSearchFilter = val;
+  clearTimeout(_pdpSearchTimer);
+  _pdpSearchTimer = setTimeout(() => {
+    renderPdpPage();
+    const inp = document.getElementById('pdp-search');
+    if (inp) { inp.focus(); inp.value = val; }
+  }, 200);
+}
+
+
+function pdpRenameRef(code_client) {
+  const current = pdpCustomNames[code_client] || '';
+  const newName = prompt('Nom à afficher pour cette référence :', current);
+  if (newName === null) return; // annulé
+  if (newName.trim()) pdpCustomNames[code_client] = newName.trim();
+  else delete pdpCustomNames[code_client];
+  renderPdpPage();
+}
+
+
+function pdpMoveRef(code_client, dir) {
+  const isRTDFam = pdpSelectedClient && pdpSelectedClient.startsWith('RTD_');
+  const lookupKey = isRTDFam ? pdpSelectedClient.slice(4) : pdpSelectedClient;
+  const sourceMap = isRTDFam ? byFamilleGlobal : byClientGlobal;
+  const refs = (sourceMap && sourceMap[lookupKey]) || [];
+  // Initialiser l'ordre si nécessaire
+  if (!pdpCustomOrder[pdpSelectedClient]) {
+    pdpCustomOrder[pdpSelectedClient] = refs.map(r => r.code_client);
+  }
+  const order = pdpCustomOrder[pdpSelectedClient];
+  const idx = order.indexOf(code_client);
+  if (idx < 0) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= order.length) return;
+  [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
+  renderPdpPage();
+}
+
+
+// Calcule la date de rupture de stock par consommation FIFO des commandes ouvertes
+// triées par date de livraison croissante, à partir du stock total disponible (FG équivalent)
+
+// Convertit une valeur date (string ISO, objet Date, ou Excel serial) en "YYYY-MM-DD"
+function pdpToISODate(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    // Getters LOCAUX — voir le même correctif (et la même explication) dans
+    // cdeToISODate (commandes.js) : revenu en arrière suite à un signalement
+    // confirmant un décalage constant d'1 jour avec la version UTC.
+    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+  const s = String(val).trim();
+  // Déjà au format YYYY-MM-DD (ou avec heure ISO)
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return isoMatch[1]+'-'+isoMatch[2]+'-'+isoMatch[3];
+  // Format DD/MM/YYYY
+  const frMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (frMatch) return frMatch[3]+'-'+frMatch[2].padStart(2,'0')+'-'+frMatch[1].padStart(2,'0');
+  return null;
+}
+
+// Mois de stock cible à reconstituer, en plus des commandes ouvertes —
+// demandé par Stéphane, 18/08/2026. Constante isolée pour pouvoir ajuster
+// facilement la cible plus tard sans chercher dans tout le fichier.
+const PDP_MOIS_STOCK_CIBLE = 2;
+
+// Quantité à produire = commandes ouvertes déjà en carnet + stock cible (N
+// mois de vente moyenne mensuelle, voir consoGetMoyenneMensuelle dans
+// conso.js) − stock FG actuel (tous niveaux, déjà fourni par l'appelant).
+// Retourne null quand la consommation moyenne n'est pas connue pour cette
+// référence (pas de vente historique importée) — on ne veut pas inventer un
+// chiffre à partir d'une moyenne à 0 ou inexistante, plutôt afficher "—".
+function pdpQtyAProduire(code_client, totalFG, cde) {
+  if (typeof consoGetMoyenneMensuelle !== 'function') return null;
+  const moyenne = consoGetMoyenneMensuelle(code_client);
+  if (!moyenne || moyenne <= 0) return null;
+  const stockCible = moyenne * PDP_MOIS_STOCK_CIBLE;
+  const besoin = (cde || 0) + stockCible - (totalFG || 0);
+  return Math.max(0, Math.ceil(besoin));
+}
+
+function pdpCalcRupture(fgCodeOrWip, stockDispo) {
+  if (typeof pcData === 'undefined' || !pcData.commandes) return null;
+
+  // Résoudre vers le code FG si c'est un niveau WIP
+  // fgCodeOrWip est soit déjà le code FG (quand appelé avec r.code_client),
+  // soit un WIP → on essaie de résoudre mais sans ambiguïté via la nomenclature
+  let fgCode = fgCodeOrWip;
+
+  // Dédup par ligne de commande (NUM_COM+LIGNE_COM) — voir le même correctif
+  // dans cdeGetAllOpenLines/cdeGetForRef (commandes.js) et pdpShowDetail
+  // ci-dessus. Sans ça, une ligne livrée en plusieurs BL partiels soustrayait
+  // son restant plusieurs fois du stock disponible dans cette simulation FIFO,
+  // avançant artificiellement la date de rupture calculée.
+  const seenLignesRupture = new Set();
+  const dedupedCommandesRupture = pcData.commandes.filter(r => {
+    const key = String(r.NUM_COM||'') + '|' + String(r.LIGNE_COM||'');
+    if (seenLignesRupture.has(key)) return false;
+    seenLignesRupture.add(key);
+    return true;
+  });
+
+  const cmdsOuvertes = dedupedCommandesRupture
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
+    .map(r => ({
+      qteRest: (Number(r.QTE_CDE)||0) - (Number(r.QTE_LIVREE)||0),
+      datDel: pdpToISODate(r.DATDEL),
+    }))
+    .filter(r => r.qteRest > 0 && r.datDel)
+    .sort((a,b) => a.datDel.localeCompare(b.datDel));
+
+  if (!cmdsOuvertes.length) return null;
+
+  let stockRestant = stockDispo;
+  for (const cmd of cmdsOuvertes) {
+    stockRestant -= cmd.qteRest;
+    if (stockRestant < 0) {
+      return { date: cmd.datDel, manque: Math.abs(stockRestant) };
+    }
+  }
+  return null; // Stock suffisant pour toutes les commandes connues
+}
+
+function pdpFmtDate(iso) {
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return d+'/'+m+'/'+y.slice(2);
+}
+
+
+// Extrait un nom court automatique (W0, W1, K09...) depuis le libellé ou le codart_wip
+function pdpAutoShortName(r) {
+  const rawSegs = r.codart_wip.split(/[_\-\s]+/);
+
+  // Suffixe de variante « longueur » (ex: L27) à toujours conserver quand il est présent :
+  // K09_L27_JNTXRO_1 et K09_JNT_XRO sont deux références DIFFÉRENTES (standard vs L27),
+  // il ne faut jamais qu'elles se retrouvent avec le même nom court "K09".
+  const lenSeg = rawSegs.find(s => /^L\d{2,3}$/i.test(s));
+  const lenSuffix = lenSeg ? lenSeg.toUpperCase() : '';
+
+  // 1. Chercher un segment Wxx isolé par des séparateurs (_, -, espace, début/fin) dans le codart_wip
+  //    ex: TENON_W1_JTO → W1 ; TENON_W40_JTO_XRO3% → W40
+  const wSeg = rawSegs.find(s => /^W\d{1,2}$/i.test(s));
+  if (wSeg) return wSeg.toUpperCase() + lenSuffix;
+
+  // Segments génériques (mots de procédé/matière/préfixe sans valeur distinctive) à
+  // ignorer avant de chercher le vrai code produit. Sans ce filtre, un scan naïf de
+  // tous les segments peut accrocher un suffixe générique par erreur — ex: pour
+  // "K05_JNT_XRO_1", combiner "XRO"+"1" donnait "XRO1", un nom partagé par TOUTES
+  // les références K05/K09/K11/K07 (toutes finissent par "_XRO_1"). Pour
+  // "TENON_N0_IND_E_1", "TENON" est juste le mot générique "tenon", le vrai code
+  // est "N0" plus loin.
+  const GENERIC = new Set(['TENON','BLISTER','FINITION','JTR','JTO','JNT','XRO','MDR','JAR','SG','IND','INDC','C','VRAC']);
+  const segs = rawSegs.filter(s => !GENERIC.has(s.toUpperCase()) && !/^L\d{2,3}$/i.test(s));
+
+  // 2. Segment déjà collé lettres+chiffres (K05, AE2, N0, S1, RS1208...) : le plus
+  //    fiable. On cherche dans l'ordre — le premier segment "utile" rencontré gagne,
+  //    jamais un segment plus loin dans la chaîne.
+  const collé = segs.find(s => /^[A-Z]{1,3}\d{1,4}(\.\d+)?$/i.test(s));
+  if (collé) return collé.toUpperCase() + lenSuffix;
+
+  // 3. Segment purement décimal (ex: "0.8", "1.0"), sans aucune lettre : parfois le
+  //    vrai diamètre/taille distinctif, alors qu'un segment alphanumérique plus loin
+  //    dans la chaîne peut être une cote commune à toute la famille et non distinctive
+  //    (ex: PF_0.8__22MM_JAR vs PF_1.0__22MM_JAR : "22MM" est une longueur partagée,
+  //    "0.8"/"1.0" est le vrai diamètre qui les distingue).
+  const decimalSeg = segs.find(s => /^\d+\.\d+$/.test(s));
+  if (decimalSeg) {
+    const prefix = segs[0] && /^[A-Z]{1,3}$/i.test(segs[0]) ? segs[0].toUpperCase() : '';
+    return prefix + decimalSeg + lenSuffix;
+  }
+
+  // 4. Segment qui contient à la fois des chiffres ET des lettres, même si l'ordre ne
+  //    colle pas au motif "collé" ci-dessus (ex: "80.04SG" = chiffres D'ABORD, puis
+  //    lettres). Ce segment est déjà suffisamment spécifique en lui-même.
+  const numSeg = segs.find(s => /\d/.test(s) && /[A-Z]/i.test(s));
+  if (numSeg) return numSeg.toUpperCase() + lenSuffix;
+
+  // 5. Base courte en lettres (ex: "ML") + un segment purement numérique isolé plus
+  //    loin dans la chaîne (ex: "ML_OVALE_1", "ML_OVALE_2"...) : on les combine pour
+  //    obtenir un nom réellement distinctif ("ML1", "ML2"...) — sinon les 4 variantes
+  //    Macro Oval se retrouvaient toutes avec le même nom court "ML". On prend le
+  //    PREMIER segment numérique rencontré (pas le dernier) : un éventuel suffixe de
+  //    révision générique en toute fin ("_1") viendrait sinon écraser le vrai numéro.
+  const letterBase = segs.find(s => /^[A-Z]{1,3}$/i.test(s));
+  const digitSeg = segs.find(s => /^\d{1,4}(\.\d+)?$/.test(s));
+  if (letterBase && digitSeg) return letterBase.toUpperCase() + digitSeg + lenSuffix;
+
+  // 6. Repli : chercher dans le libellé un nombre après "Size"/"#" (ex: "Size 1", "#1.2").
+  //    Seulement si AUCUN segment utile ne contient de chiffre — càd que le code
+  //    produit ne donne lui-même aucune info distinctive et qu'on n'a pas le choix.
+  const hasAnyDigit = segs.some(s => /\d/.test(s));
+  if (!hasAnyDigit) {
+    const sizeMatch = r.libelle_fg.match(/(?:Size|#)\s*([\d.,]+)/i);
+    if (sizeMatch) {
+      const prefix = segs[0] && /^[A-Z]{1,4}$/i.test(segs[0]) ? segs[0].toUpperCase() : '';
+      return prefix + sizeMatch[1] + lenSuffix;
+    }
+  }
+
+  // 7. Repli final : premier segment utile du codart_wip s'il est court, sinon tronqué
+  const firstWord = segs[0] || rawSegs[0] || r.codart_wip;
+  return (firstWord.length <= 12 ? firstWord.toUpperCase() : r.codart_wip.slice(0, 10).toUpperCase()) + lenSuffix;
+}
+
+// Détecte un marqueur de variante « longueur » (ex: L27) isolé par des séparateurs
+// dans une chaîne. Utilisé pour ne jamais laisser un OF de variante L27 matcher la
+// tuile standard (ou l'inverse), même quand le nom court/racine ("K09") est identique.
+// Construit, une fois par génération de correspondances actives, la table
+// nom court → ensemble des codart_wip DISTINCTS qui le produisent. Sert à
+// désactiver le repli par nom court (règle 2 de pdpGetOFsForRef, ci-dessous)
+// quand ce nom est ambigu entre plusieurs produits différents — ex: "AE2" est
+// partagé par AE2_ILLUSION_X-RO (famille Macro Ill XRO) ET AE2_JTR (famille
+// Macrolock, un produit différent) sans aucun marqueur pour les distinguer.
+// Mieux vaut ne pas rapprocher un OF que de le rapprocher de la mauvaise
+// référence. Ce mécanisme est générique : il protège contre CE type de
+// collision quel que soit le nom court concerné, sans avoir à coder un cas
+// particulier à chaque nouvelle famille de produits ambiguë.
+let _pdpShortNameMapCache = null;
+let _pdpShortNameMapCacheKey = null;
+function _pdpGetShortNameMap() {
+  if (typeof pdpGetActiveCorrespondances !== 'function') return {};
+  const refs = pdpGetActiveCorrespondances();
+  const key = refs.length;
+  if (_pdpShortNameMapCache && _pdpShortNameMapCacheKey === key) return _pdpShortNameMapCache;
+  const map = {};
+  refs.forEach(r => {
+    const sn = pdpAutoShortName(r);
+    if (!sn) return;
+    if (!map[sn]) map[sn] = new Set();
+    map[sn].add(r.codart_wip);
+  });
+  _pdpShortNameMapCache = map;
+  _pdpShortNameMapCacheKey = key;
+  return map;
+}
+
+// Score combien de segments du codart_wip (découpé par _ - espace) se retrouvent,
+// même abrégés, dans le produit de l'OF — sert à départager deux références qui
+// partagent le même nom court (ex: AE2_ILLUSION_X-RO vs AE2_JTR, toutes deux "AE2").
+// Un segment compte comme retrouvé s'il est identique à un segment du produit, ou
+// si l'un est le préfixe de l'autre (ex: "ILL" est un préfixe de "ILLUSION").
+// Les segments génériques de procédé/matière (JTR, JTO, JNT, XRO...) sont ignorés :
+// ils apparaissent quasi tels quels sur des dizaines de références RTD totalement
+// différentes (ex: 80.04SG_JTR, 90.06SG_JTR, AE2_JTR partagent tous "_JTR" sans
+// aucun rapport entre eux) — les compter aurait fait remonter des OF sans rapport
+// dès qu'un nom court devenait ambigu. Les COULEURS ne sont PAS dans cette liste :
+// contrairement aux codes de procédé, elles sont parfois le SEUL élément qui
+// distingue deux SKU différents (ex: S1_JTO_BLANC vs S1_JTO chez MAILLEFER).
+const _PDP_GENERIC_SEGMENTS = new Set([
+  'JTR','JTO','JNT','XRO','MDR','JAR','SG','IND','INDC','C','VRAC',
+]);
+function _pdpSegmentOverlapScore(codart_wip, produitRaw) {
+  const wipSegs = String(codart_wip||'').toUpperCase().split(/[_\-\s]+/).filter(Boolean)
+    .filter(s => !_PDP_GENERIC_SEGMENTS.has(s));
+  const prodSegs = String(produitRaw||'').toUpperCase().split(/[_\-\s]+/).filter(Boolean);
+  let score = 0;
+  wipSegs.forEach(ws => {
+    if (prodSegs.some(ps => ps === ws || ws.startsWith(ps) || ps.startsWith(ws))) score++;
+  });
+  return score;
+}
+
+// Nombre de segments distinctifs (hors segments génériques de procédé/matière)
+// d'un codart_wip — sert à départager une égalité de score : entre deux
+// candidats qui couvrent le même nombre de segments trouvés dans le produit
+// de l'OF, celui qui a le MOINS de segments distinctifs au total est mieux
+// confirmé (couverture complète) que celui qui en a plus (couverture partielle,
+// un segment manquant comme "BLANC" simplement absent du nom de l'OF).
+function _pdpSegmentCount(codart_wip) {
+  return String(codart_wip||'').toUpperCase().split(/[_\-\s]+/).filter(Boolean)
+    .filter(s => !_PDP_GENERIC_SEGMENTS.has(s)).length;
+}
+
+function _pdpLenVariant(str) {
+  // Recherche "L" + 2 ou 3 chiffres n'importe où dans la chaîne, pas seulement
+  // comme segment isolé entre séparateurs — certains codart_wip ont L27 collé
+  // au segment précédent sans underscore (ex: "K07L27_JNT_XRO_1"), ce qui
+  // empêchait de détecter la variante longueur côté référence alors que l'OF
+  // correspondant l'avait bien détectée (ex: OF "K07 L27", "L27" isolé par un
+  // espace) — les deux étaient alors traités comme des variantes différentes
+  // et la correspondance rejetée à tort.
+  const m = String(str||'').toUpperCase().match(/L(\d{2,3})(?!\d)/);
+  return m ? 'L'+m[1] : null;
+}
+
+// Trouve les OFs en cours (Kanban) correspondant à une référence WIP
+// Recherche souple : le produit de l'OF contient le codart_wip (ou inversement),
+// en ignorant la casse et les séparateurs _ - espace
+// ATTENTION : le sens « target.includes(prod) » (produit d'OF plus court que le
+// codart_wip) est dangereux quand un standard et sa variante L27 partagent le même
+// préfixe (K09 vs K09_L27_JNTXRO_1 → "K09" est un préfixe littéral des deux). On ne
+// l'autorise donc que si le produit de l'OF est quasi complet (tronqué de 2 caractères
+// maximum), jamais pour un simple fragment court comme "K09". On vérifie en plus que
+// le marqueur de variante longueur (L27...) est cohérent entre l'OF et la référence :
+// un OF "K09_L27_..." ne doit jamais remonter sur la tuile standard "K09", et
+// inversement.
+function pdpGetOFsForRef(codart_wip, shortName) {
+  if (typeof ofs === 'undefined') return [];
+  const norm = s => String(s||'').toUpperCase().replace(/,/g, '.').replace(/[_\-\s%]/g, '');
+  const target = norm(codart_wip);
+  const targetShort = shortName ? norm(shortName) : null;
+  const refLenVariant = _pdpLenVariant(codart_wip);
+
+  // Si le nom court est partagé par plusieurs codart_wip différents (ex: "S1" =
+  // S1_JTO ET S1_JTO_BLANC, deux SKU distincts ; "AE2" = AE2_ILLUSION_X-RO ET
+  // AE2_JTR), calculé UNE fois pour toutes les références de ce match.
+  const snMap = _pdpGetShortNameMap();
+  const candidates = shortName ? snMap[shortName] : null;
+  const ambiguous = candidates && candidates.size > 1;
+
+  return ofs.filter(o => {
+    if (_pdpLenVariant(o.produit) !== refLenVariant) return false;
+    const prod = norm(o.produit);
+    if (!prod) return false;
+
+    if (ambiguous) {
+      // ATTENTION : ici on NE PEUT PLUS utiliser les règles larges 1a/1b — elles
+      // confondraient par exemple S1_JTO_BLANC avec S1_JTO (le premier est un
+      // préfixe littéral du second, donc "S1JTO" est retrouvé tel quel dans
+      // "S1JTOBLANC" par la règle 1a, alors que ce sont deux SKU différents).
+      // Seule une correspondance EXACTE du code complet passe direct ; sinon on
+      // départage uniquement par score de recouvrement de segments (voir plus haut).
+      if (target && prod === target) return true;
+      // Le score de recouvrement seul ne suffit pas : un mot générique partagé par
+      // toute la famille (ex: "BLANC", présent dans S1_JTO_BLANC comme S5_JTO_BLANC)
+      // pouvait à lui seul faire gagner un point, sans que l'identifiant distinctif
+      // (le nom court lui-même, ex "S5") soit réellement présent dans le produit de
+      // l'OF. On exige donc d'abord sa présence — le score ne sert plus qu'à
+      // départager entre plusieurs candidates qui le contiennent toutes.
+      if (!prod.includes(targetShort)) return false;
+      const myScore = _pdpSegmentOverlapScore(codart_wip, o.produit);
+      if (myScore <= 0) return false;
+      const myTotal = _pdpSegmentCount(codart_wip);
+      const beaten = [...candidates].some(c => {
+        if (c === codart_wip) return false;
+        const cScore = _pdpSegmentOverlapScore(c, o.produit);
+        if (cScore > myScore) return true;
+        if (cScore < myScore) return false;
+        // Égalité de score : l'OF ne mentionne aucun segment qui distinguerait
+        // les deux — celui qui a le MOINS de segments distinctifs à couvrir a une
+        // couverture complète (ex: S3_JTO, un seul segment "S3", trouvé) tandis que
+        // l'autre a un segment manquant (ex: S3_JTO_BLANC, "BLANC" absent de l'OF) :
+        // on préfère la couverture complète plutôt que de rejeter les deux.
+        return _pdpSegmentCount(c) < myTotal;
+      });
+      return !beaten;
+    }
+
+    // 1a. Le code complet de la référence est retrouvé tel quel dans le produit de l'OF
+    //     (ex: OF "TENON K09_L27_JNTXRO_1 LOT4") : sens toujours fiable ici, puisque
+    //     le nom court n'est PAS ambigu (pas de risque de confondre avec un autre SKU).
+    if (target && prod.includes(target)) return true;
+    // 1b. Produit de l'OF quasi complet mais légèrement tronqué (repli), jamais un simple
+    //     fragment/préfixe court qui pourrait aussi bien désigner un autre produit.
+    if (target && prod.length >= 6 && (target.length - prod.length) <= 2 && target.includes(prod)) return true;
+    // 2. Repli : correspondance sur le nom court (W1, K101, K09L27...) en tant que segment
+    //    isolé, pas juste une sous-chaîne, pour éviter que W1 matche W10/W11 par erreur.
+    if (targetShort) {
+      const segs = String(o.produit||'').toUpperCase().split(/[_\-\s]+/).map(norm);
+      if (segs.includes(targetShort)) return true;
+      // 3. Repli supplémentaire : nom court à PLUSIEURS mots (ex: "PF 1.2") — la
+      // comparaison segment par segment ci-dessus ne peut pas fonctionner ici,
+      // puisque le nom court normalisé fusionne ses propres espaces ("PF1.2")
+      // alors que les segments de l'OF restent séparés ("PF", "1.2"). On compare
+      // donc aussi la chaîne ENTIÈRE normalisée du produit de l'OF.
+      if (prod === targetShort) return true;
+    }
+    return false;
+  });
+}
+
+// Retrouve la référence PDP (correspondance) à laquelle un OF tenon donné est
+// rattaché — la recherche inverse de pdpGetOFsForRef, réutilisant EXACTEMENT
+// la même logique de correspondance floue (donc toujours cohérent avec les
+// badges "En prod" déjà affichés sur les tuiles) plutôt que de réimplémenter
+// un matching séparé. Demandé par Stéphane, 18/08/2026, pour pouvoir cliquer
+// sur le produit d'un OF (modale Kanban) et atterrir sur sa tuile PDP.
+function pdpFindRefForOF(o) {
+  if (!o || typeof pdpGetActiveCorrespondances !== 'function') return null;
+  const corrs = pdpGetActiveCorrespondances();
+  for (const r of corrs) {
+    const shortName = (typeof pdpCustomNames !== 'undefined' && pdpCustomNames[r.code_client])
+      || (typeof pdpAutoShortName === 'function' ? pdpAutoShortName(r) : null);
+    if (pdpGetOFsForRef(r.codart_wip, shortName).some(x => x.id === o.id)) return r;
+  }
+  return null;
+}
+
+// Ferme la modale OF, bascule sur l'onglet PDP et ouvre directement le détail
+// de la référence correspondante.
+function pdpGoToRefFromOF(ofId) {
+  const o = (typeof ofs !== 'undefined') ? ofs.find(x => x.id === ofId) : null;
+  if (!o) return;
+  const r = pdpFindRefForOF(o);
+  if (!r) {
+    if (typeof showToast === 'function') showToast('Référence PDP introuvable pour ce produit');
+    return;
+  }
+  if (typeof closeOverlay === 'function') closeOverlay();
+  if (typeof pdpSelectedClient !== 'undefined') pdpSelectedClient = r.client;
+  if (typeof setView === 'function') setView('pdp'); // appelle déjà render() en interne
+  if (typeof pdpShowDetail === 'function') pdpShowDetail(r.code_client);
+}
+
+
+// Résout un codart_wip vers le code FG final de sa nomenclature
+// Les commandes clients portent toujours sur le FG, jamais sur un WIP intermédiaire
+function pdpResolveFG(codart_wip, code_client) {
+  if (typeof nomenclatures === 'undefined') return code_client || codart_wip;
+  // Si on a le code_client (FG connu), chercher la nomenclature dont le FG matche
+  if (code_client) {
+    const nomByFG = nomenclatures.find(n => n && n.etapes &&
+      n.etapes.some(e => e.codart === code_client && e.ratio === null));
+    if (nomByFG) return code_client;
+    // Le code_client est peut-être déjà un FG sans nomenclature propre → le retourner tel quel
+    return code_client;
+  }
+  // Sinon repli : première nomenclature contenant ce WIP
+  const nom = (typeof findNomenclatureByCodart === 'function') ? findNomenclatureByCodart(codart_wip) : null;
+  if (!nom) return codart_wip;
+  // Dernière étape à ratio nul = le FG terminal, pas la première (une chaîne à
+  // ratios tous vides, ex AXIS, aurait sinon renvoyé le tenon de départ)
+  const fgEtape = nom.etapes.slice().reverse().find(e => e.ratio === null);
+  return fgEtape ? fgEtape.codart : codart_wip;
+}
+
+
+// Calcule le stock total FG équivalent pour une référence (tous niveaux de nomenclature)
+// Définie ici pour être disponible depuis pdp.js et besoins.js
+function pdpGotoStock(codart_wip) {
+  if (typeof setView === 'function') setView('stock');
+  // Laisser le temps à la vue de se charger avant de sélectionner la référence
+  setTimeout(() => {
+    if (typeof stockSelectRef === 'function') stockSelectRef(codart_wip);
+  }, 50);
+}
+
+// Construit le détail niveau par niveau (tenon, blister, FG...) d'une référence,
+// avec le stock et son équivalent FG par niveau. Réutilisée par pdpShowDetail (tuile
+// PDP) et par la modale de détail commande (commandes.js, encadré au survol du
+// stock) — NE PAS redupliquer cette construction ailleurs. `zones` optionnel
+// ({blister:[...], fg:[...]}) applique la même restriction de zone que
+// pdpGetTotalFGForRefZoned, pour que le détail affiché corresponde exactement au
+// total déjà montré.
+function pdpGetLevelsBreakdown(codart_wip, code_client, zones) {
+  // Introkit : un "niveau" par composant (stock blister ÷ qté par kit), total
+  // = le composant le plus rare, pas une nomenclature classique. Voir
+  // pdpIntrokitStockDispo et la même logique dans renderTile.
+  if (typeof INTROKITS !== 'undefined' && INTROKITS[code_client]) {
+    const kit = INTROKITS[code_client];
+    const levels = kit.composants.map(c => {
+      const stk = (typeof pdpGetStockForWip === 'function') ? pdpGetStockForWip(c.codart) : 0;
+      const kitsPossibles = Math.floor((stk || 0) / (c.qte || 1));
+      return { label: c.label, codart: c.codart, stk, enc: 0, total: stk, fgEquiv: kitsPossibles, isFG: false, isBlister: true };
+    });
+    const totalFG = levels.length ? Math.min(...levels.map(l => l.fgEquiv)) : 0;
+    return { nom: null, levels, totalFG, blisterIdx: -1, isIntrokit: true };
+  }
+
+  const noms = pdpFindAllNomenclatures(codart_wip, code_client);
+
+  // blisterIdx calculé systématiquement (pas seulement si zones) : sert aussi au
+  // regroupement en 3 catégories (tenons / blisters / FG) côté affichage.
+  // Calculé sur la 1ère chaîne (la "standard") — les chaînes additionnelles
+  // (ex: BCHINE) ont leur propre restriction de zone par étape (zoneRestrict),
+  // qui prime de toute façon sur blisterIdx (voir pdpStockForEtape).
+  let blisterIdx = -1;
+  if (noms.length) {
+    const refNom = noms[0];
+    blisterIdx = refNom.etapes.findIndex(e => /BLIST/i.test(e.label||'') || /BLIST/i.test(e.codart||''));
+    if (blisterIdx < 0) blisterIdx = refNom.etapes.length > 1 ? 1 : 0;
+  }
+
+  let levels;
+  if (noms.length) {
+    levels = [];
+    noms.forEach((nom, chainIdx) => {
+      const chainZone = nom.etapes.find(e => e.zoneRestrict);
+      nom.etapes.forEach((e, i) => {
+        let cumRatio = 1;
+        for (let j = i; j < nom.etapes.length - 1; j++) {
+          if (nom.etapes[j].ratio) cumRatio *= nom.etapes[j].ratio;
+        }
+        const stk = pdpStockForEtape(e, zones, i, chainIdx === 0 ? blisterIdx : -1);
+        const enc = (i === 0 && typeof nomGetEnCours !== 'undefined') ? nomGetEnCours(e.codart) : 0;
+        const total = stk + enc;
+        levels.push({
+          label: e.label, codart: e.codart, stk, enc, total,
+          fgEquiv: cumRatio > 1 ? Math.floor(total/cumRatio) : total,
+          isFG: e.ratio === null, isBlister: chainIdx === 0 && i === blisterIdx,
+          chainStart: i === 0 && chainIdx > 0, // 1ère étape d'une chaîne additionnelle -> intertitre
+          chainName: (i === 0 && chainIdx > 0) ? (chainZone ? 'Chaîne ' + chainZone.zoneRestrict : nom.nom) : null,
+        });
+      });
+    });
+  } else {
+    const stk = (zones && typeof pdpGetStockForZone === 'function') ? pdpGetStockForZone(codart_wip, zones.fg) : pdpGetStockForWip(codart_wip);
+    const enc = pdpGetEnCoursForWip(codart_wip);
+    levels = [{ label: codart_wip, codart: codart_wip, stk, enc, total: stk+enc, fgEquiv: stk+enc, isFG: true, isBlister: false }];
+  }
+  const totalFG = levels.reduce((s,l) => s + l.fgEquiv, 0);
+  return { nom: noms[0]||null, levels, totalFG, blisterIdx };
+}
+
+function pdpShowDetail(code_client) {
+  const ref = pdpGetActiveCorrespondances().find(r => r.code_client === code_client);
+  if (!ref) return;
+
+  const { nom, levels, totalFG } = pdpGetLevelsBreakdown(ref.codart_wip, ref.code_client, null);
+
+  // Code FG pour les commandes : utiliser directement code_client (c'est le FG connu)
+  // au lieu de remonter la nomenclature (qui peut trouver un autre FG partageant le même WIP)
+  const fgCode = code_client;
+  // Dédup par ligne de commande (NUM_COM+LIGNE_COM) — voir le même correctif et
+  // la même explication dans cdeGetAllOpenLines/cdeGetForRef (commandes.js) :
+  // sans ça, une ligne livrée en plusieurs BL partiels apparaît en double ici
+  // ET fausse le calcul de rupture FIFO plus bas (double comptage du restant).
+  const seenLignes = new Set();
+  const dedupedCmds = (typeof pcData !== 'undefined' ? (pcData.commandes||[]) : []).filter(r => {
+    const key = String(r.NUM_COM||'') + '|' + String(r.LIGNE_COM||'');
+    if (seenLignes.has(key)) return false;
+    seenLignes.add(key);
+    return true;
+  });
+  const cmds = dedupedCmds
+    .filter(r => String(r.REF_RTD||'').trim() === fgCode && String(r.COMMANDE_S||'').trim() !== 'O')
+    .map(r => ({
+      numCmd: String(r.NUM_COM||''),
+      client: String(r.LIBFOU||r.CODCLI||''),
+      qteCde: Number(r.QTE_CDE)||0,
+      qteLiv: Number(r.QTE_LIVREE)||0,
+      qteRest: (Number(r.QTE_CDE)||0) - (Number(r.QTE_LIVREE)||0),
+      datDel: pdpToISODate(r.DATDEL),
+    }))
+    .filter(r => r.qteRest > 0)
+    .sort((a,b) => (a.datDel||'9999').localeCompare(b.datDel||'9999'));
+
+  const totalCde = cmds.reduce((s,c) => s+c.qteRest, 0);
+  const solde = totalFG - totalCde;
+  const ok = solde >= 0;
+  const rupture = pdpCalcRupture(code_client, totalFG);
+
+  // OFs en cours du Kanban liés à cette référence
+  const autoShortM = pdpAutoShortName(ref);
+  const ofsModal = pdpGetOFsForRef(ref.codart_wip, autoShortM)
+    .concat(typeof foretsGetOFsForRef === 'function' ? foretsGetOFsForRef(ref.codart_wip) : []);
+
+  const displayName = pdpCustomNames[code_client] || ref.libelle_fg;
+  const col = PDP_CLIENT_COLORS[ref.client] || RTD_FAM_COLORS[ref.famille] || {bg:'var(--bg)',dot:'var(--accent)',text:'var(--accent)'};
+
+  const COLORS = ['#4C8EDA','#1D9E75','#D4880A','#7C3AED'];
+  const barMax = Math.max(...levels.map(l => l.fgEquiv), totalCde, 1);
+
+  let _levelNum = 0;
+  const levelsHtml = levels.map((lv,i) => {
+    if (lv.chainStart) _levelNum = 0;
+    _levelNum++;
+    const color = lv.isFG ? '#7C3AED' : COLORS[Math.min(_levelNum-1,COLORS.length-1)];
+    const pct = Math.round(lv.fgEquiv/barMax*100);
+    return (lv.chainStart
+        ? '<div style="margin:14px 0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);display:flex;align-items:center;gap:6px">'
+          + '<i class="ti ti-git-branch" style="font-size:11px"></i>' + lv.chainName + '</div>'
+        : '')
+      + '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
+      + '<span style="width:24px;height:24px;border-radius:50%;background:'+color+';color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+_levelNum+'</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:13px;font-weight:600;color:var(--text)">'+lv.label+'</div>'
+      + '<div style="font-size:10px;color:var(--text-faint);font-family:monospace">'+lv.codart+'</div>'
+      + '<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:4px">'
+      + '<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0">'
+      + '<div style="font-size:14px;font-weight:700;color:'+color+'">'+lv.total.toLocaleString('fr')+'</div>'
+      + '<div style="font-size:10px;color:var(--text-faint)">'+lv.fgEquiv.toLocaleString('fr')+' FG</div>'
+      + '</div></div>';
+  }).join('');
+
+  // Récap mensuel des quantités restantes (regroupé par mois de livraison) —
+  // demandé par Stéphane, 12/08/2026, pour voir d'un coup d'œil la charge par
+  // mois sans avoir à additionner ligne par ligne.
+  const MOIS_FR = ['Janv.','Févr.','Mars','Avr.','Mai','Juin','Juil.','Août','Sept.','Oct.','Nov.','Déc.'];
+  const byMonth = {};
+  cmds.forEach(c => {
+    const key = c.datDel ? c.datDel.slice(0,7) : 'sans-date'; // YYYY-MM
+    byMonth[key] = (byMonth[key]||0) + c.qteRest;
+  });
+  const monthKeys = Object.keys(byMonth).sort();
+  const monthlyRecapHtml = monthKeys.length > 1
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+      + monthKeys.map(k => {
+          const label = k === 'sans-date' ? 'Sans date' : MOIS_FR[+k.slice(5,7)-1] + ' ' + k.slice(2,4);
+          return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;text-align:center">'
+            + '<div style="font-size:9px;color:var(--text-faint);text-transform:uppercase">'+label+'</div>'
+            + '<div style="font-size:14px;font-weight:700;color:#633806">'+byMonth[k].toLocaleString('fr')+'</div>'
+            + '</div>';
+        }).join('')
+      + '</div>'
+    : '';
+
+  const cmdsHtml = cmds.length
+    ? '<table class="cat-table" style="width:100%"><thead><tr><th>N° Cde</th><th>Client</th><th style="text-align:right">Cdé</th><th style="text-align:right">Livré</th><th style="text-align:right">Restant</th><th>Livraison</th></tr></thead><tbody>'
+      + cmds.map(c => '<tr'
+        + (typeof cdeGotoOrder === 'function'
+            ? ' onclick="closeOverlay();setTimeout(()=>cdeGotoOrder(\''+c.numCmd.replace(/'/g,"\\'")+'\'),50)" style="cursor:pointer" title="Voir le détail de cette commande"'
+            : '')
+        + '>'
+        + '<td style="font-size:11px;font-family:monospace;color:var(--accent)">'+c.numCmd+'</td>'
+        + '<td style="font-size:12px">'+c.client+'</td>'
+        + '<td style="text-align:right;font-size:12px">'+c.qteCde.toLocaleString('fr')+'</td>'
+        + '<td style="text-align:right;font-size:12px;color:var(--text-muted)">'+c.qteLiv.toLocaleString('fr')+'</td>'
+        + '<td style="text-align:right"><span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#633806">'+c.qteRest.toLocaleString('fr')+'</span></td>'
+        + '<td style="font-size:11px;color:var(--text-muted)">'+(c.datDel?pdpFmtDate(c.datDel):'\u2014')+'</td>'
+        + '</tr>').join('')
+      + '</tbody></table>'
+    : '<div style="text-align:center;padding:24px;color:var(--text-faint)"><i class="ti ti-circle-check" style="font-size:24px;display:block;margin-bottom:6px;color:#27500A"></i>Aucune commande ouverte</div>';
+
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+
+  modal.innerHTML =
+    '<div class="modal-header"><h2><i class="ti ti-package" style="color:'+col.text+';margin-right:8px"></i>'+displayName+'</h2>'
+    + '<button class="close-btn" onclick="closeOverlay()"><i class="ti ti-x"></i></button></div>'
+    + '<div class="modal-body" style="display:flex;flex-direction:column;gap:16px">'
+
+    // En-tête code + solde
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<span style="font-size:11px;font-family:monospace;color:var(--text-faint)">'+ref.code_client+' \u2192 '+ref.codart_wip+'</span>'
+    + '<span style="margin-left:auto;font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:'+(ok?'#EAF3DE':'#FCEBEB')+';color:'+(ok?'#27500A':'#A32D2D')+'">'
+    + (ok?'\u2713 ':'\u2717 ')+solde.toLocaleString('fr')+' FG disponibles'+'</span>'
+    + '</div>'
+
+    // Matière de pultrusion utilisée (si connue) — clic renvoie vers sa tuile
+    // dans l'onglet Pultrusion.
+    + (() => {
+        if (typeof pultGetJoncForTenon !== 'function') return '';
+        const jonc = pultGetJoncForTenon(ref.codart_wip);
+        if (!jonc || !jonc.matiere) return '';
+        return '<div onclick="closeOverlay(); if(typeof setView===\'function\')setView(\'pultrusion\'); if(typeof pultShowDetail===\'function\')pultShowDetail(\''+jonc.matiere.replace(/'/g,"\\'")+'\');" '
+          + 'style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);cursor:pointer;width:fit-content;padding:3px 10px;border-radius:20px;background:var(--bg)" '
+          + 'onmouseenter="this.style.background=\'var(--accent-light)\'" onmouseleave="this.style.background=\'var(--bg)\'" '
+          + 'title="Voir la tuile pultrusion de cette matière">'
+          + '<i class="ti ti-columns-2" style="font-size:12px"></i> Jonc : <strong>'+jonc.matiere+'</strong>'
+          + (jonc.tenonsParMl ? ' <span style="color:var(--text-faint)">('+jonc.tenonsParMl+' tenons/ML)</span>' : '')
+          + ' <i class="ti ti-arrow-right" style="font-size:11px;margin-left:2px"></i>'
+          + '</div>';
+      })()
+
+    // KPIs
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+    + '<div style="flex:1;min-width:100px;background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text-faint);text-transform:uppercase">Stock total</div>'
+    + '<div style="font-size:20px;font-weight:700;color:'+col.text+'">'+totalFG.toLocaleString('fr')+'</div></div>'
+    + '<div style="flex:1;min-width:100px;background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text-faint);text-transform:uppercase">Commandé</div>'
+    + '<div style="font-size:20px;font-weight:700;color:#A32D2D">'+totalCde.toLocaleString('fr')+'</div></div>'
+    + '<div style="flex:1.3;min-width:130px;background:'+(rupture?'#FCEBEB':'#EAF3DE')+';border-radius:var(--radius);padding:12px;text-align:center">'
+    + '<div style="font-size:10px;color:'+(rupture?'#A32D2D':'#27500A')+';text-transform:uppercase">Date de rupture</div>'
+    + '<div style="font-size:18px;font-weight:700;color:'+(rupture?'#A32D2D':'#27500A')+'">'+(rupture?pdpFmtDate(rupture.date):'Aucune')+'</div>'
+    + (rupture?'<div style="font-size:10px;color:#A32D2D">manque '+rupture.manque.toLocaleString('fr')+' pièces</div>':'')
+    + '</div>'
+    + (() => {
+        // Couverture de stock (conso.js) : facultative, n'apparaît que si le module est
+        // chargé et qu'une donnée de consommation existe pour ce codart_wip.
+        if (typeof consoGetCouvertureMois !== 'function') return '';
+        const mois = consoGetCouvertureMois(ref.code_client, totalFG);
+        if (mois === null) return '';
+        const cs = consoCouvertureStyle(mois);
+        return '<div style="flex:1;min-width:110px;background:'+cs.bg+';border-radius:var(--radius);padding:12px;text-align:center">'
+          + '<div style="font-size:10px;color:'+cs.text+';text-transform:uppercase">Couverture</div>'
+          + '<div style="font-size:18px;font-weight:700;color:'+cs.text+'">'+consoFmtMois(mois)+'</div>'
+          + '<div style="font-size:9px;color:var(--text-faint)">vs conso. moyenne</div></div>';
+      })()
+    + '</div>'
+
+    // À produire — détail du calcul (commandes + stock cible 2 mois − stock
+    // actuel) — demandé par Stéphane, 18/08/2026, pour voir le détail plutôt
+    // que juste le chiffre final affiché sur la tuile.
+    + (() => {
+        if (typeof consoGetMoyenneMensuelle !== 'function') return '';
+        const moyenne = consoGetMoyenneMensuelle(code_client);
+        if (!moyenne || moyenne <= 0) return '';
+        const stockCible = Math.round(moyenne * PDP_MOIS_STOCK_CIBLE);
+        const aProduire = pdpQtyAProduire(code_client, totalFG, totalCde);
+        const resColor = aProduire > 0 ? '#92400E' : '#27500A';
+        const resBg = aProduire > 0 ? '#FFF4E6' : '#EAF3DE';
+        const ligne = (label, val, color) => '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0">'
+          + '<span style="color:var(--text-muted)">'+label+'</span>'
+          + '<strong style="color:'+color+'">'+val+'</strong></div>';
+        return '<div style="background:var(--bg);border-radius:var(--radius);padding:12px 14px">'
+          + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">'
+          + '<i class="ti ti-calculator" style="vertical-align:-2px;margin-right:5px"></i>À produire \u2014 d\u00e9tail du calcul</div>'
+          + ligne('Commandes ouvertes', '+ '+totalCde.toLocaleString('fr'), '#A32D2D')
+          + ligne('Stock cible ('+PDP_MOIS_STOCK_CIBLE+' mois \u00d7 '+Math.round(moyenne).toLocaleString('fr')+' u/mois en moyenne)', '+ '+stockCible.toLocaleString('fr'), '#633806')
+          + ligne('Stock actuel (tous niveaux)', '\u2212 '+totalFG.toLocaleString('fr'), '#27500A')
+          + '<div style="border-top:1px dashed var(--border-med);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:center">'
+          + '<span style="font-size:12px;font-weight:600">= \u00c0 produire</span>'
+          + '<span style="font-size:15px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+resBg+';color:'+resColor+'">'+aProduire.toLocaleString('fr')+'</span>'
+          + '</div></div>';
+      })()
+
+    // Niveaux de stock (arborescence)
+    + '<div>'
+    + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Niveaux de stock</div>'
+    + levelsHtml
+    + '</div>'
+
+
+    // OFs en cours Kanban
+    + (ofsModal.length > 0
+      ? '<div style="margin-bottom:0">'
+        + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">'
+        + '<i class="ti ti-tool" style="vertical-align:-2px;margin-right:5px"></i>'+ofsModal.length+' OF(s) en cours de production</div>'
+        + '<div style="display:flex;flex-direction:column;gap:6px">'
+        + ofsModal.map(o => {
+            const sLbls = {creation:'Création',attente:'Attente',usinage:'Usinage',controle:'Contrôle',joint:'Mise en joint',blister:'Blisterage',boite:'Mise en boîte'};
+            const COLORS = ['#4C8EDA','#1D9E75','#D4880A','#7C3AED'];
+            const nrm = s => String(s||'').toUpperCase().replace(/[_\-\s%]/g,'');
+            const matchedEtape = nom ? nom.etapes.find(e => {
+              const en = nrm(e.codart), pn = nrm(o.produit);
+              return en && pn && (en.includes(pn) || pn.includes(en));
+            }) : null;
+            const levelLabel = matchedEtape ? matchedEtape.label : null;
+            const etapeIdx = matchedEtape && nom ? nom.etapes.indexOf(matchedEtape) : -1;
+            const levelColor = etapeIdx >= 0 ? (nom.etapes[etapeIdx].ratio === null ? '#7C3AED' : COLORS[Math.min(etapeIdx, COLORS.length-1)]) : 'var(--text-faint)';
+            const dl2 = o.deadline ? pdpFmtDate(o.deadline.slice(0,10)) : null;            const late2 = o.deadline && new Date(o.deadline) < new Date();            return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border-radius:var(--radius);cursor:pointer"'              +' onclick="closeOverlay();setTimeout(()=>{if(typeof openOf===\'function\')openOf(\''+o.id+'\');else if(typeof openDetail===\'function\')openDetail(\''+o.id+'\')},50)"'              +' onmouseenter="this.style.background=\'var(--accent-light)\'"'              +' onmouseleave="this.style.background=\'var(--bg)\'"'              + '>'              + '<span style="font-size:11px;font-weight:700;font-family:monospace;color:var(--accent)">'+o.id+'</span>'              + '<div style="flex:1;min-width:0">'              + '<div style="font-size:12px;color:var(--text);font-weight:500">'+o.produit+'</div>'              + (levelLabel ? '<div style="font-size:10px;font-weight:600;color:'+levelColor+'">→ '+levelLabel+'</div>' : '')              + '</div>'              + '<span style="font-size:12px;font-weight:600;color:var(--text)">'+o.qty.toLocaleString('fr')+' u.</span>'              + (dl2 ? '<span style="font-size:10px;font-weight:600;color:'+(late2?'#A32D2D':'#27500A')+'">'+dl2+'</span>' : '')              + '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:#FFF4E6;color:#92400E">'+(sLbls[o.stage]||o.stage)+'</span>'              + '<i class="ti ti-chevron-right" style="font-size:10px;color:var(--text-faint)"></i>'              + '</div>';
+          }).join('')
+        + '</div></div>'
+      : '')
+
+    // Commandes
+    + '<div>'
+    + '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">'
+    + '<i class="ti ti-shopping-cart" style="vertical-align:-2px;margin-right:5px"></i>'+cmds.length+' commande(s) ouverte(s)</div>'
+    + monthlyRecapHtml
+    + cmdsHtml
+    + '</div>'
+
+    + '</div>'
+    + '<div class="modal-footer">'
+    + '<button class="btn" data-pdp-action="goto-stock" data-pdp-arg="'+ref.codart_wip+'" onclick="closeOverlay()"><i class="ti ti-arrow-right"></i> Voir dans Stock & Commandes</button>'
+    + '<button class="btn" onclick="closeOverlay();setTimeout(()=>pdpRenameRef(\''+code_client+'\'),100)"><i class="ti ti-pencil"></i> Renommer</button>'
+    + '<button class="btn" style="color:#A32D2D;border-color:#A32D2D" onclick="closeOverlay();setTimeout(()=>pdpDeleteRef(\''+code_client+'\'),100)"><i class="ti ti-trash"></i> Supprimer</button>'
+    + '<button class="btn" onclick="closeOverlay()">Fermer</button>'
+    + '</div>';
+
+  document.getElementById('overlay').classList.add('open');
+}
+
+// ── Import du fichier Excel de correspondances (remplace PDP_CORRESPONDANCES)
+let pdpImportedCorrespondances = null; // null = utilise les données par défaut
+let pdpLastImportDate = null;
+
+function pdpGetActiveCorrespondances() {
+  return pdpImportedCorrespondances || PDP_CORRESPONDANCES;
+}
+
+function pdpImportCorrespondances(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (typeof showToast === 'function') showToast('Chargement ' + file.name + '…');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    loadXLSXForPdp(() => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+
+        // ── Lire l'onglet "Noms d'usage" si présent
+        // Chercher par contenu : feuille ayant une colonne "Code Client (FG)" ET "Nom"
+        let wsNoms = null;
+        for (const sName of wb.SheetNames) {
+          const ws = wb.Sheets[sName];
+          const firstRows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+          if (firstRows.length && firstRows[0].some(h => String(h||'').includes('Code Client'))) {
+            // Vérifier que c'est bien la feuille noms (a une colonne Nom mais pas "Client" seul)
+            const hasNom = firstRows[0].some(h => String(h||'').toLowerCase().includes('nom'));
+            const hasClient = firstRows[0].some(h => String(h||'').trim() === 'Client');
+            if (hasNom && !hasClient) { wsNoms = ws; break; }
+          }
+        }
+        if (wsNoms) {
+          const nomRows = XLSX.utils.sheet_to_json(wsNoms, {defval:''});
+          nomRows.forEach(r => {
+            const code = String(r['Code Client (FG)']||'').trim();
+            // Chercher la colonne "Nom d'usage personnalisé" quelle que soit l'encodage exact
+            const nomKey = Object.keys(r).find(k => k.toLowerCase().includes('personnalis') || k.toLowerCase().includes('usage'));
+            const nom = nomKey ? String(r[nomKey]||'').trim() : '';
+            if (code && nom) pdpCustomNames[code] = nom;
+          });
+        }
+
+        // ── Lire l'onglet "Correspondances"
+        // Chercher par nom exact, puis par contenu (feuille ayant une colonne "Client")
+        let wsCorr = null;
+        for (const sName of wb.SheetNames) {
+          const ws = wb.Sheets[sName];
+          const firstRows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+          if (firstRows.length && firstRows[0].some(h => String(h||'').trim() === 'Client')) {
+            wsCorr = ws; break;
+          }
+        }
+        if (!wsCorr) wsCorr = wb.Sheets[wb.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json(wsCorr, {defval:''});
+
+        // Format multi-lignes : une ligne par étape, regroupées par "Code Client (FG)"
+        const lines = rawRows.map(r => ({
+          client:      String(r['Client']||'').trim(),
+          famille:     String(r['Famille']||r['Client']||'').trim(),
+          code_client: String(r['Code Client (FG)']||r['Code Client']||'').trim(),
+          libelle_fg:  String(r['Libellé FG']||r['Libelle FG']||'').trim(),
+          ordre:       Number(r['Ordre'])||1,
+          codart_wip:  String(r['CODART WIP']||'').trim(),
+          label_etape: String(r['Libellé étape']||r['Libelle etape']||'').trim(),
+          ratio:       (r['Ratio → étape suivante']!==''&&r['Ratio → étape suivante']!==undefined)
+                        ? Number(r['Ratio → étape suivante'])
+                        : ((r['Ratio']!==''&&r['Ratio']!==undefined) ? Number(r['Ratio']) : null),
+          // Matière : sert de marqueur de zone de stock dédiée pour cette étape (ex:
+          // "BCHINE" -> ne compter que le stock physiquement dans cette zone). Ajouté
+          // le 14/08/2026 pour distinguer les chaînes d'approvisionnement Chine des
+          // chaînes standard qui partagent le même code FG (ex: 5010001).
+          matiere:     String(r['Matière']||r['Matiere']||'').trim(),
+        })).filter(r => r.client && r.codart_wip);
+        // NE PAS trier globalement par ordre ici : ça entrelacerait les étapes de
+        // deux chaînes distinctes partageant le même code_client (ex: 5010001 a une
+        // chaîne "standard" ET une chaîne "Chine", chacune avec ses propres Ordre
+        // 1/2/3) — voir la scission par groupe ci-dessous, qui a besoin de l'ordre
+        // ORIGINAL du fichier pour détecter où une nouvelle chaîne recommence.
+
+        if (!lines.length) {
+          if (typeof showToast === 'function') showToast('✗ Aucune ligne valide trouvée dans le fichier');
+          return;
+        }
+
+        // Grouper par code_client (FG), en PRÉSERVANT l'ordre du fichier (pas de tri
+        // global par ordre — voir commentaire ci-dessus).
+        const groups = {};
+        lines.forEach(l => {
+          groups[l.code_client] = groups[l.code_client] || [];
+          groups[l.code_client].push(l);
+        });
+
+        // Scinde un groupe en chaînes distinctes : une nouvelle chaîne commence
+        // chaque fois que "Ordre" NE progresse PAS strictement par rapport à la ligne
+        // précédente (redescend à 1, ou se répète) — signe qu'on repart d'un nouveau
+        // point de départ WIP pour le même code FG (ex: chaîne standard vs chaîne
+        // Chine pour 5010001).
+        function splitIntoChains(groupLines) {
+          const chains = [];
+          let current = [];
+          let prevOrdre = -Infinity;
+          groupLines.forEach(l => {
+            if (l.ordre <= prevOrdre && current.length) { chains.push(current); current = []; }
+            current.push(l);
+            prevOrdre = l.ordre;
+          });
+          if (current.length) chains.push(current);
+          return chains.map(c => [...c].sort((a,b) => a.ordre - b.ordre));
+        }
+
+        const newCorrespondances = [];
+        const newNomenclatures = [];
+
+        Object.keys(groups).forEach(codeClient => {
+          const chains = splitIntoChains(groups[codeClient]);
+
+          chains.forEach((etapes, chainIdx) => {
+            const first = etapes[0];
+            const chainSuffix = chainIdx > 0 ? '__v' + (chainIdx+1) : '';
+
+            // Correspondance : une seule par code_client (la 1ère chaîne = chaîne
+            // "standard", sert de référence pour l'autocomplétion/l'affichage général).
+            // Les chaînes suivantes ne créent pas de doublon dans la liste de
+            // références — seule leur nomenclature (le calcul de stock) est ajoutée.
+            if (chainIdx === 0) {
+              newCorrespondances.push({
+                client: first.client,
+                famille: first.famille,
+                code_client: codeClient,
+                libelle_fg: first.libelle_fg,
+                codart_wip: first.codart_wip,
+              });
+            }
+
+            if (etapes.length > 1) {
+              newNomenclatures.push({
+                id: 'imp_' + codeClient.replace(/[^a-zA-Z0-9]/g,'_') + chainSuffix,
+                code_client: codeClient, // champ explicite : permet de retrouver TOUTES
+                                          // les chaînes d'un même code FG (pdpFindAllNomenclatures)
+                nom: first.client + ' — ' + first.libelle_fg + ' (' + codeClient + ')' + (chainIdx>0 ? ' [variante '+(chainIdx+1)+']' : ''),
+                etapes: etapes.map(e => ({
+                  codart: e.codart_wip,
+                  label: e.label_etape || e.codart_wip,
+                  ratio: (e.ratio === null || isNaN(e.ratio)) ? null : e.ratio,
+                  // Restriction de zone (ex: "BCHINE") : cette étape ne doit compter que
+                  // le stock physiquement dans cette zone, pas le stock général.
+                  // La colonne "Matière" sert à DEUX choses différentes selon la ligne :
+                  // pour la quasi-totalité des références, elle indique le TYPE DE
+                  // MATIÈRE PREMIÈRE (jonc) utilisé, ex: "JTO_ROUGE_2.5" — une info
+                  // descriptive, PAS un emplacement de stock. Seule la valeur "BCHINE"
+                  // est un vrai marqueur de zone de stock dédiée (voir 5010001). Traiter
+                  // n'importe quelle valeur non-vide comme une restriction de zone
+                  // envoyait la recherche de stock vers une zone appelée "JTO_ROUGE_2.5"
+                  // (qui n'existe pas), ramenant le stock à 0 pour presque toutes les
+                  // références. Bug introduit le 14/08/2026, trouvé et corrigé le
+                  // 15/08/2026 grâce aux tests en direct de Stéphane dans la console.
+                  zoneRestrict: (e.matiere === 'BCHINE') ? e.matiere : null,
+                })),
+              });
+            }
+          });
+        });
+
+        pdpImportedCorrespondances = newCorrespondances;
+        if (typeof nomenclatures !== 'undefined') {
+          // Remplacer entièrement par les nomenclatures importées
+          nomenclatures.length = 0;
+          newNomenclatures.forEach(n => nomenclatures.push(n));
+        }
+        pdpLastImportDate = new Date().toLocaleDateString('fr-FR');
+        if (typeof showToast === 'function') {
+          const nbNoms = Object.keys(pdpCustomNames).length;
+          showToast('✓ ' + newCorrespondances.length + ' références, ' + newNomenclatures.length + ' nomenclatures, ' + nbNoms + ' noms importés');
+        }
+        pdpSelectedClient = null;
+        renderPdpPage();
+        if (typeof scheduleSave === 'function') scheduleSave();
+      } catch(err) {
+        if (typeof showToast === 'function') showToast('✗ Erreur de lecture du fichier : ' + err.message);
+      }
+    });
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = '';
+}
+
+// Charge SheetJS (déjà potentiellement chargé par stock.js/planning) sans le recharger en double
+let _pdpXlsxLoaded = false;
+function loadXLSXForPdp(cb) {
+  if (typeof XLSX !== 'undefined') { cb(); return; }
+  if (_pdpXlsxLoaded) { setTimeout(() => loadXLSXForPdp(cb), 100); return; }
+  _pdpXlsxLoaded = true;
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload = cb;
+  document.head.appendChild(s);
+}
+
+// ── Tri alphabétique des tuiles par nom d'affichage
+function pdpSortAZ() {
+  if (!pdpSelectedClient) return;
+  const isRTD = pdpSelectedClient.startsWith('RTD_');
+  const key = isRTD ? pdpSelectedClient.slice(4) : pdpSelectedClient;
+  const pool = isRTD ? (byFamilleGlobal[key]||[]) : (byClientGlobal[pdpSelectedClient]||[]);
+  // Trier par nom d'affichage (nom personnalisé > nom court auto)
+  const sorted = [...pool]
+    .filter(r => !pdpDeletedRefs.includes(r.code_client))
+    .sort((a, b) => {
+      const na = pdpCustomNames[a.code_client] || pdpAutoShortName(a);
+      const nb = pdpCustomNames[b.code_client] || pdpAutoShortName(b);
+      return na.localeCompare(nb, 'fr', {numeric: true});
+    });
+  pdpCustomOrder[pdpSelectedClient] = sorted.map(r => r.code_client);
+  schedulePdpSave();
+  renderPdpPage();
+}
+
+// ── Réinitialiser l'ordre par défaut (supprimer l'ordre personnalisé)
+function pdpResetOrder() {
+  if (!pdpSelectedClient) return;
+  delete pdpCustomOrder[pdpSelectedClient];
+  schedulePdpSave();
+  renderPdpPage();
+}
+
+// ── Supprimer définitivement une référence (avec confirmation)
+function pdpDeleteRef(code_client) {
+  const ref = pdpGetActiveCorrespondances().find(r => r.code_client === code_client);
+  const name = (ref ? (pdpCustomNames[code_client] || pdpAutoShortName(ref)) : code_client);
+  if (!confirm('Supprimer définitivement la référence "' + name + '" ?\n\nElle disparaîtra du PDP jusqu\'à ce que vous reimportiez les correspondances.')) return;
+  if (!pdpDeletedRefs.includes(code_client)) pdpDeletedRefs.push(code_client);
+  schedulePdpSave();
+  renderPdpPage();
+}
+
+// ── Sauvegarde des préférences PDP sur Render (légère, sans les données ERP)
+function schedulePdpSave() {
+  if (typeof scheduleSave === 'function') scheduleSave();
+}
