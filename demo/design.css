@@ -794,3 +794,13 @@ body.tv .dz-hero{margin-top:0}
 .id-row span b{display:inline;font-size:inherit}.id-row div>span:only-child{color:var(--text)}
 
 .id-par{display:flex;flex-direction:column;gap:12px;margin-top:16px}.id-pr{display:grid;grid-template-columns:minmax(120px,1.1fr) 1.4fr 56px;gap:12px;align-items:center;font-size:12.5px;animation:slideIn .4s both}.id-pr b{text-align:right}.id-pr .id-bar{height:10px}
+
+/* Mode TV : commandes (précédent / pause / suivant / pages / durée) */
+body.tv .cl-tv-ctl{display:flex;align-items:center;gap:8px}
+body.tv .cl-tv-ctl button,body.tv .cl-tv-ctl select{background:rgba(255,255,255,.12);border:0;color:#fff;font:600 11.5px var(--font);padding:5px 11px;border-radius:99px;cursor:pointer}
+body.tv .cl-tv-ctl select{padding:5px 8px;appearance:auto}body.tv .cl-tv-ctl select option{color:#111}
+body.tv .cl-tv-ctl button:hover{background:rgba(255,255,255,.25)}
+body.tv .cl-tv-dots{display:flex;gap:6px;align-items:center;margin:0 4px}
+body.tv .cl-tv-dots b{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.3);cursor:pointer}
+body.tv .cl-tv-dots b.on{background:var(--glow);transform:scale(1.25)}
+@media(max-width:700px){body.tv .cl-tv-dots{display:none}}

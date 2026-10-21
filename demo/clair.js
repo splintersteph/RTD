@@ -134,7 +134,13 @@
         <div class="cl-drawer-h"><b><i class="ti ti-help-circle"></i> Aide</b><button onclick="clairHelp(false)" aria-label="Fermer"><i class="ti ti-x"></i></button></div>
         <div class="cl-drawer-b" id="cl-drawer-b"></div>
       </div>
-      <div class="cl-tv-bar" id="cl-tv-bar"><i></i><span id="cl-tv-lab"></span><button onclick="clairTV(false)"><i class="ti ti-x"></i> Quitter (Échap)</button></div>`);
+      <div class="cl-tv-bar" id="cl-tv-bar"><i></i><span id="cl-tv-lab"></span>
+        <div class="cl-tv-ctl"><button onclick="clairTVStep(-1)" title="Page précédente (←)" aria-label="Page précédente"><i class="ti ti-player-skip-back"></i></button>
+        <button id="cl-tv-pp" onclick="clairTVPause()" title="Pause / reprise (Espace)"><i class="ti ti-player-pause"></i> Pause</button>
+        <button onclick="clairTVStep(1)" title="Page suivante (→)" aria-label="Page suivante"><i class="ti ti-player-skip-forward"></i></button>
+        <div class="cl-tv-dots" id="cl-tv-dots"></div>
+        <select id="cl-tv-sec" onchange="clairTVSpeed(this.value)" title="Durée d'affichage de chaque page"><option value="15">15 s</option><option value="25" selected>25 s</option><option value="40">40 s</option><option value="60">60 s</option></select></div>
+        <button onclick="clairTV(false)"><i class="ti ti-x"></i> Quitter (Échap)</button></div>`);
   }
   window.clairHelp = function (open) {
     ensureShell();
@@ -156,29 +162,56 @@
 
   // ───────────────────────── Mode TV ─────────────────────────
   const TV_VIEWS = ['jour', 'synthese', 'cockpit', 'besoins', 'stats', 'abc', 'forets', 'pdp'];
-  const TV_SEC = 25;
-  let tvTimer = 0, tvIdx = 0, tvT0 = 0;
-  function tvShow() {
-    const v = TV_VIEWS[tvIdx % TV_VIEWS.length];
-    if (v === 'stats') window._statsTab = 'encours';
-    setView(v, false); tvT0 = performance.now();
-    const lab = document.getElementById('cl-tv-lab'); if (lab) lab.textContent = (document.title || '').replace('PlanProd — ', '') + '  ·  ' + (tvIdx % TV_VIEWS.length + 1) + '/' + TV_VIEWS.length;
-    const bar = document.querySelector('#cl-tv-bar > i'); if (bar) { bar.style.transition = 'none'; bar.style.width = '0'; void bar.offsetWidth; bar.style.transition = `width ${TV_SEC}s linear`; bar.style.width = '100%'; }
+  let TV_SEC = 25;
+  let tvTimer = 0, tvIdx = 0, tvPaused = false;
+  const tvN = () => TV_VIEWS.length;
+  function tvArm() { clearTimeout(tvTimer); if (!tvPaused) tvTimer = setTimeout(() => { tvIdx = (tvIdx + 1) % tvN(); tvShow(); }, TV_SEC * 1000); }
+  function tvBar() {
+    const bar = document.querySelector('#cl-tv-bar > i'); if (!bar) return;
+    bar.style.transition = 'none'; bar.style.width = '0'; void bar.offsetWidth;
+    if (!tvPaused) { bar.style.transition = `width ${TV_SEC}s linear`; bar.style.width = '100%'; } else { bar.style.width = '100%'; bar.style.opacity = '.35'; }
+    if (!tvPaused) bar.style.opacity = '1';
   }
+  function tvUi() {
+    const pp = document.getElementById('cl-tv-pp');
+    if (pp) pp.innerHTML = tvPaused ? '<i class="ti ti-player-play"></i> Reprendre' : '<i class="ti ti-player-pause"></i> Pause';
+    const d = document.getElementById('cl-tv-dots');
+    if (d) d.innerHTML = TV_VIEWS.map((v, k) => `<b class="${k === tvIdx ? 'on' : ''}" onclick="clairTVGo(${k})" title="Aller à cette page"></b>`).join('');
+  }
+  function tvShow() {
+    const v = TV_VIEWS[tvIdx % tvN()];
+    if (v === 'stats') window._statsTab = 'encours';
+    setView(v, false);
+    const lab = document.getElementById('cl-tv-lab'); if (lab) lab.textContent = (document.title || '').replace('PlanProd — ', '') + '  ·  ' + (tvIdx % tvN() + 1) + '/' + tvN() + (tvPaused ? '  ·  en pause' : '');
+    tvBar(); tvUi(); tvArm();
+  }
+  window.clairTVStep = d => { if (!document.body.classList.contains('tv')) return; tvIdx = ((tvIdx + d) % tvN() + tvN()) % tvN(); tvShow(); };
+  window.clairTVGo = k => { if (!document.body.classList.contains('tv')) return; tvIdx = k % tvN(); tvShow(); };
+  window.clairTVPause = () => {
+    if (!document.body.classList.contains('tv')) return;
+    tvPaused = !tvPaused; tvShow();
+  };
+  window.clairTVSpeed = v => { TV_SEC = Math.max(5, +v || 25); tvShow(); };
   window.clairTV = function (on) {
     ensureShell();
     const active = document.body.classList.contains('tv');
     if (on === undefined) on = !active;
     if (on === active) return;
     if (on) {
-      document.body.classList.add('tv'); clairHelp(false); tvIdx = 0; tvShow();
-      tvTimer = setInterval(() => { tvIdx++; tvShow(); }, TV_SEC * 1000);
+      document.body.classList.add('tv'); clairHelp(false); tvIdx = 0; tvPaused = false; tvShow();
       try { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
     } else {
-      document.body.classList.remove('tv'); clearInterval(tvTimer);
+      document.body.classList.remove('tv'); clearTimeout(tvTimer);
       try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
     }
   };
+  document.addEventListener('keydown', e => {
+    if (!document.body.classList.contains('tv')) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '') && e.key !== 'Escape') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); clairTVStep(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); clairTVStep(-1); }
+    else if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); clairTVPause(); }
+  });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.body.classList.contains('tv')) clairTV(false); else clairHelp(false); } });
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('tv')) clairTV(false); });
 
