@@ -8,8 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="PlanProd">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="vendor/tabler/tabler-icons.min.css">
+<link rel="stylesheet" href="vendor/fonts.css">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -3494,7 +3494,7 @@ let _xlsxLoaded = false;
 function loadXLSX(cb) {
   if (_xlsxLoaded) { cb(); return; }
   const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.src = 'vendor/xlsx.full.min.js';
   s.onload = () => { _xlsxLoaded = true; cb(); };
   document.head.appendChild(s);
 }
@@ -3791,7 +3791,7 @@ function pcExport() {
   const lines = [h.join(';')];
   rows.forEach(r => lines.push([r.famille,r.code,r.fg,r.commentaire,
     Math.round(r.stockWIP),Math.round(r.qteEnCours),Math.round(r.stockVenir),
-    Math.round(r.commandes),Math.round(r.stockRest)].join(';')));
+    Math.round(r.commandes),Math.round(r.stockRest)].map(window.csvSafe).join(';')));
   const blob = new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

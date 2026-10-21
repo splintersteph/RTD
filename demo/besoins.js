@@ -351,7 +351,7 @@ function besToggle(key, id) {
 function besoinsExport() {
   const rows = besFiltered().map(it => { const sp = besSplit(it); return [it.r.code_client, it.displayName, it.r.libelle_fg || '', it.r.client || '', it.rupture.date, sp.manque, it.totalCde, it.totalFG, sp.enProd, sp.reste, (it.cmds || []).map(c => c.numCmd).join(' ')]; });
   const head = ['Référence', 'Nom', 'Libellé', 'Client', 'Date de rupture', 'Manque', 'Commandé', 'Stock FG', 'En production', 'Reste à lancer', 'N° commandes'];
-  const csv = '﻿' + [head, ...rows].map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+  const csv = '﻿' + [head, ...rows].map(r => r.map(v => '"' + String(window.csvSafe(v) == null ? '' : window.csvSafe(v)).replace(/"/g, '""') + '"').join(';')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'besoins_' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
