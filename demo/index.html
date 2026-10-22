@@ -342,6 +342,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
     <button class="sidebar-item" id="nav-etsi" onclick="setView('etsi')"><i class="ti ti-bulb"></i>Et si ?</button>
     <button class="sidebar-item" id="nav-fiab" onclick="setView('fiab')"><i class="ti ti-heartbeat"></i>Fiabilité machines</button>
     <button class="sidebar-item" id="nav-heat" onclick="setView('heat')"><i class="ti ti-grid-dots"></i>Carte thermique</button>
+    <button class="sidebar-item" id="nav-vsm" onclick="setView('vsm')"><i class="ti ti-route"></i>Chaîne de valeur</button>
     <button class="sidebar-item" id="nav-arrets" onclick="setView('arrets')"><i class="ti ti-alert-octagon"></i>Arrêts machines</button>
     <button class="sidebar-item" id="nav-stats" onclick="setView('stats')"><i class="ti ti-chart-bar"></i>Statistiques</button>
     <button class="sidebar-item" id="nav-revue" onclick="setView('revue')"><i class="ti ti-presentation"></i>Revue hebdo</button>
@@ -396,6 +397,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh
       <div class="flex-view" id="view-revue" style="padding:0"></div>
       <div class="flex-view" id="view-fiab" style="padding:0"></div>
       <div class="flex-view" id="view-heat" style="padding:0"></div>
+      <div class="flex-view" id="view-vsm" style="padding:0"></div>
       <div class="flex-view" id="view-cockpit" style="padding:0"></div>
       <div class="flex-view" id="view-forets" style="padding:0"></div>
       <div class="list-view" id="list-view"></div>
@@ -2403,6 +2405,7 @@ function render(){
   renderStats();buildSidebar();renderAlertBanner();
   if(currentView==='fiab'){if(typeof renderFiab==='function')renderFiab();}
   else if(currentView==='heat'){if(typeof renderHeat==='function')renderHeat();}
+  else if(currentView==='vsm'){if(typeof renderVsm==='function')renderVsm();}
   else if(currentView==='abc'){if(typeof renderABC==='function')renderABC();}
   else if(currentView==='jour'){if(typeof renderJour==='function')renderJour();}
   else if(currentView==='etsi'){if(typeof renderEtsi==='function')renderEtsi();}
@@ -2443,22 +2446,22 @@ function render(){
   else if(currentView==='planning')renderPlanningComposite();
 }
 
-const VALID_VIEWS=['jour','etsi','arrets','revue','fiab','heat','abc','synthese','cockpit','kanban','forets','list','archives','3m','gantt','stats','pdp','besoins','conso','commandes','planning','pultrusion'];
+const VALID_VIEWS=['jour','etsi','arrets','revue','fiab','heat','vsm','abc','synthese','cockpit','kanban','forets','list','archives','3m','gantt','stats','pdp','besoins','conso','commandes','planning','pultrusion'];
 
 function setView(v,pushState=true){
   if(!VALID_VIEWS.includes(v))v='kanban';
   currentView=v;
   if(pushState&&location.hash!=='#'+v)history.pushState({view:v},'','#'+v);
-  const views={jour:'view-jour',etsi:'view-etsi',arrets:'view-arrets',revue:'view-revue',fiab:'view-fiab',heat:'view-heat',abc:'view-abc',synthese:'view-synthese',cockpit:'view-cockpit',kanban:'kanban-view',forets:'view-forets',list:'list-view',archives:'archive-view','3m':'view-3m',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
+  const views={jour:'view-jour',etsi:'view-etsi',arrets:'view-arrets',revue:'view-revue',fiab:'view-fiab',heat:'view-heat',vsm:'view-vsm',abc:'view-abc',synthese:'view-synthese',cockpit:'view-cockpit',kanban:'kanban-view',forets:'view-forets',list:'list-view',archives:'archive-view','3m':'view-3m',gantt:'view-gantt',stats:'view-stats',pdp:'view-pdp',besoins:'view-besoins',conso:'view-conso',commandes:'view-commandes',planning:'view-planning',pultrusion:'view-pultrusion'};
   Object.entries(views).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.style.display=k===v?'flex':'none';});
   document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.remove('active'));
-  const navMap={jour:'nav-jour',etsi:'nav-etsi',arrets:'nav-arrets',revue:'nav-revue',fiab:'nav-fiab',heat:'nav-heat',abc:'nav-abc',synthese:'nav-synthese',cockpit:'nav-cockpit',kanban:'nav-kanban',forets:'nav-forets',list:'nav-list',archives:'nav-archives','3m':'nav-3m',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
+  const navMap={jour:'nav-jour',etsi:'nav-etsi',arrets:'nav-arrets',revue:'nav-revue',fiab:'nav-fiab',heat:'nav-heat',vsm:'nav-vsm',abc:'nav-abc',synthese:'nav-synthese',cockpit:'nav-cockpit',kanban:'nav-kanban',forets:'nav-forets',list:'nav-list',archives:'nav-archives','3m':'nav-3m',gantt:'nav-gantt',stats:'nav-stats',pdp:'nav-pdp',besoins:'nav-besoins',conso:'nav-conso',commandes:'nav-commandes',planning:'nav-planning',pultrusion:'nav-pultrusion'};
   if(navMap[v])document.getElementById(navMap[v])?.classList.add('active');
   if(v==='kanban'||v==='list'){sideFilter='all';stageFilter='';}
   document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
   const bnMap={kanban:'bn-kanban',list:'bn-list',archives:'bn-archives','3m':'bn-3m',gantt:'bn-gantt'};
   if(bnMap[v])document.getElementById(bnMap[v])?.classList.add('active');
-  const labels={jour:'Aujourd\'hui',etsi:'Et si ?',arrets:'Arrêts machines',revue:'Revue hebdo',fiab:'Fiabilité machines',heat:'Carte thermique',abc:'Gammes ABC',synthese:'En clair',cockpit:'Cockpit',kanban:'Kanban',list:'Liste',archives:'Archives','3m':'Objectif 3M',gantt:'Gantt',stats:'Statistiques',pdp:'PDP',besoins:'Besoins',conso:'Consommation',commandes:'Commandes',planning:'Planning Composite',pultrusion:'Pultrusion'};
+  const labels={jour:'Aujourd\'hui',etsi:'Et si ?',arrets:'Arrêts machines',revue:'Revue hebdo',fiab:'Fiabilité machines',heat:'Carte thermique',vsm:'Chaîne de valeur',abc:'Gammes ABC',synthese:'En clair',cockpit:'Cockpit',kanban:'Kanban',list:'Liste',archives:'Archives','3m':'Objectif 3M',gantt:'Gantt',stats:'Statistiques',pdp:'PDP',besoins:'Besoins',conso:'Consommation',commandes:'Commandes',planning:'Planning Composite',pultrusion:'Pultrusion'};
   document.title='PlanProd — '+(labels[v]||v);
   render();
 }
@@ -4502,6 +4505,8 @@ loadData();
 <script src="abc.js?v=20261021b"></script>
 <script src="fiab.js?v=20261021b"></script>
 <script src="heat.js?v=20261022a"></script>
+<script src="vsm.js?v=20261022a"></script>
+<script src="tabs.js?v=20261022a"></script>
 <script src="forets.js?v=20261021b"></script>
 <script src="idees.js?v=20261021b"></script>
 <script>
