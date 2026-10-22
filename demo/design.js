@@ -51,6 +51,10 @@
       } else if (view === 'stats' && typeof window.statsHist === 'function') {
         const o = window.statsHist();
         if (o.ok) { const s = o.s; out.push([s.n, 'OF produits'], [s.pieces, 'pièces produites']); if (s.otd != null) out.push([Math.round(s.otd * 100), '% livrés à l\'heure', true]); if (s.lead != null) out.push([Math.round(s.lead), 'jours de délai médian']); }
+      } else if (view === 'pultrusion' && typeof pultGetActiveRefs === 'function') {
+        const L = pultGetActiveRefs().map(r => ({ c: pultCouvertureMois(r), ml: (pultGetLiveStock(r.code) !== null ? pultGetLiveStock(r.code) : ((r.stockMezzMl || 0) + (r.stockRtdMl || 0))) }));
+        const c1 = L.filter(x => x.c != null && x.c < 1).length, c3 = L.filter(x => x.c != null && x.c >= 1 && x.c < 3).length;
+        out.push([L.length, 'références de joncs'], [c1, 'à moins d\'1 mois', false, c1 ? 'warn' : ''], [c3, 'entre 1 et 3 mois'], [L.reduce((s, x) => s + x.ml, 0), 'mètres en stock'], [(typeof pultOFs !== 'undefined' ? pultOFs.length : 0), 'OF en cours']);
       } else if (view === 'archives' && typeof archives !== 'undefined') {
         out.push([archives.length, 'OF archivés'], [archives.reduce((s, o) => s + (Number(o.qty) || 0), 0), 'pièces produites']);
       }
