@@ -24,10 +24,14 @@
       + (isAdmin() ? '<label class="btn" style="font-size:11px;padding:3px 9px;cursor:pointer"><i class="ti ti-file-import"></i> Importer<input type="file" accept=".xlsx,.xls,.csv" style="display:none" class="cs-in"></label>' : '')
       + '</span></div>';
     if (!L.length) return head + '<p style="color:var(--text-faint);font-size:13px;margin:0">Aucun consommable renseigné pour ce produit.' + (isAdmin() ? ' Téléchargez le modèle, remplissez-le puis importez-le.' : '') + '</p>';
-    return head + '<table class="cat-table" style="width:100%"><thead><tr><th>Type</th><th>Référence</th><th>Désignation</th><th style="text-align:right">Par produit</th><th style="text-align:right">Pour 1 000</th></tr></thead><tbody>'
+    const px = isAdmin() && L.some(i => i.prix_prod != null || i.prix_vente != null);   // prix : administrateurs uniquement
+    const eur = n => n == null ? '—' : (+n).toLocaleString('fr', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) + ' €';
+    const tot = k => L.reduce((a, i) => a + (i[k] != null ? i.qte * i[k] : 0), 0);
+    return head + '<table class="cat-table" style="width:100%"><thead><tr><th>Type</th><th>Référence</th><th>Désignation</th><th style="text-align:right">Par produit</th><th style="text-align:right">Pour 1 000</th>' + (px ? '<th style="text-align:right">Prix de production</th><th style="text-align:right">Prix de vente</th>' : '') + '</tr></thead><tbody>'
       + L.map(i => '<tr><td style="font-size:12px"><i class="ti ' + (ICON[norm(i.type)] || 'ti-circle-dot') + '" style="vertical-align:-2px;margin-right:5px;color:var(--accent)"></i>' + esc(i.type || '—') + '</td>'
         + '<td style="font-size:12px;font-family:monospace">' + esc(i.ref) + '</td><td style="font-size:12px">' + esc(i.designation) + (i.fournisseur ? ' <span style="color:var(--text-faint)">· ' + esc(i.fournisseur) + '</span>' : '') + '</td>'
-        + '<td style="text-align:right;font-size:12px">' + (+i.qte).toLocaleString('fr') + '</td><td style="text-align:right;font-size:12px">' + Math.round(i.qte * 1000).toLocaleString('fr') + '</td></tr>').join('')
+        + '<td style="text-align:right;font-size:12px">' + (+i.qte).toLocaleString('fr') + '</td><td style="text-align:right;font-size:12px">' + Math.round(i.qte * 1000).toLocaleString('fr') + '</td>' + (px ? '<td style="text-align:right;font-size:12px">' + eur(i.prix_prod) + '</td><td style="text-align:right;font-size:12px">' + eur(i.prix_vente) + '</td>' : '') + '</tr>').join('')
+      + (px ? '<tr style="font-weight:700"><td colspan="5" style="text-align:right;font-size:12px">Total par produit</td><td style="text-align:right;font-size:12px">' + eur(tot('prix_prod')) + '</td><td style="text-align:right;font-size:12px">' + eur(tot('prix_vente')) + '</td></tr>' : '')
       + '</tbody></table>';
   }
 
@@ -44,14 +48,14 @@
   };
 
   // ── modèle / export Excel (même mise en page pour remplir et pour ré-exporter) ──
-  const COLS = ['Produit (code)', 'Type', 'Référence consommable', 'Désignation', 'Quantité par produit', 'Fournisseur', 'Commentaire'];
+  const COLS = ['Produit (code)', 'Type', 'Référence consommable', 'Désignation', 'Quantité par produit', 'Fournisseur', 'Commentaire', 'Prix de production (€)', 'Prix de vente (€)'];
   function telecharger(code) {
     if (typeof XLSX === 'undefined') return loadXLSX(() => telecharger(code));
     const safe = v => (typeof window.csvSafe === 'function' ? window.csvSafe(v) : v);
-    const rows = ITEMS.length ? ITEMS.map(i => [i.produit, i.type, i.ref, i.designation, i.qte, i.fournisseur, i.commentaire])
-      : [[code || '7100318946', 'Boîte', 'BOX-001', 'Boîte carton 10 pièces', 1, '', 'EXEMPLE : à remplacer'], [code || '7100318946', 'Notice', 'NOT-014', 'Notice d\'utilisation FR/EN', 1, '', ''], [code || '7100318946', 'Étiquette', 'ETQ-220', 'Étiquette lot', 1, '', '']];
+    const rows = ITEMS.length ? ITEMS.map(i => [i.produit, i.type, i.ref, i.designation, i.qte, i.fournisseur, i.commentaire, i.prix_prod, i.prix_vente])
+      : [[code || '7100318946', 'Boîte', 'BOX-001', 'Boîte carton 10 pièces', 1, '', 'EXEMPLE : à remplacer', 0.12, 0.2], [code || '7100318946', 'Notice', 'NOT-014', 'Notice d\'utilisation FR/EN', 1, '', '', 0.03, 0.05], [code || '7100318946', 'Étiquette', 'ETQ-220', 'Étiquette lot', 1, '', '', 0.01, 0.02]];
     const ws = XLSX.utils.aoa_to_sheet([COLS].concat(rows.map(r => r.map(safe))));
-    ws['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 22 }, { wch: 40 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 22 }, { wch: 40 }, { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 18 }];
     const wp = XLSX.utils.aoa_to_sheet([['Produit (code)', 'Désignation', 'Client']].concat(produits().map(p => [p.code_client, p.libelle_fg, p.client].map(safe))));
     wp['!cols'] = [{ wch: 18 }, { wch: 46 }, { wch: 16 }];
     const wm = XLSX.utils.aoa_to_sheet([
@@ -60,8 +64,9 @@
       ['2. « Produit (code) » : le code de la feuille « Produits » (copiez-le tel quel).'],
       ['3. « Type » : Boîte, Notice, Étiquette, Sachet, Accessoire ou Autre.'],
       ['4. « Quantité par produit » : combien de ce consommable pour 1 produit (1 boîte pour 10 pièces = 0,1).'],
-      ['5. Si une référence change : corrigez la ligne, puis réimportez le fichier. L\'import REMPLACE toute la liste actuelle.'],
-      ['6. Pour repartir de la liste actuelle : le bouton « Modèle / export » la contient déjà.']]);
+      ['5. Prix (réservés aux administrateurs, jamais visibles par les lecteurs) : prix de production et prix de vente d\'UNE unité du consommable, en euros. Colonnes facultatives.'],
+      ['6. Si une référence change : corrigez la ligne, puis réimportez le fichier. L\'import REMPLACE toute la liste actuelle.'],
+      ['7. Pour repartir de la liste actuelle : le bouton « Modèle / export » la contient déjà.']]);
     wm['!cols'] = [{ wch: 110 }];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Consommables'); XLSX.utils.book_append_sheet(wb, wp, 'Produits'); XLSX.utils.book_append_sheet(wb, wm, 'Mode d\'emploi');
     XLSX.writeFile(wb, 'correspondances_consommables.xlsx');
@@ -77,7 +82,8 @@
       let rows;
       try { const wb = XLSX.read(e.target.result, { type: 'array' }); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }); } catch (x) { return alert('Fichier illisible.'); }
       const map = { 'produit code': 'produit', 'produit': 'produit', 'code produit': 'produit', 'code client': 'produit', 'type': 'type', 'reference consommable': 'ref', 'reference': 'ref', 'ref': 'ref', 'designation': 'designation', 'libelle': 'designation',
-        'quantite par produit': 'qte', 'quantite': 'qte', 'qte': 'qte', 'fournisseur': 'fournisseur', 'commentaire': 'commentaire' };
+        'quantite par produit': 'qte', 'quantite': 'qte', 'qte': 'qte', 'fournisseur': 'fournisseur', 'commentaire': 'commentaire',
+        'prix de production': 'prix_prod', 'prix production': 'prix_prod', 'prix prod': 'prix_prod', 'prix de vente': 'prix_vente', 'prix vente': 'prix_vente' };
       const items = [], erreurs = [], connus = new Set(produits().map(p => String(p.code_client)));
       rows.forEach((r, i) => {
         const o = {}; Object.keys(r).forEach(k => { const m = map[norm(k)]; if (m) o[m] = r[k]; });
@@ -86,6 +92,9 @@
         const q = o.qte === '' || o.qte == null ? 1 : Number(String(o.qte).replace(',', '.'));
         if (!o.produit || !o.ref) return erreurs.push('Ligne ' + (i + 2) + ' : produit ou référence manquant');
         if (!(q > 0 && q <= 100000)) return erreurs.push('Ligne ' + (i + 2) + ' : quantité invalide');
+        const px = k => { const v = o[k]; if (v === '' || v == null) return null; const n = Number(String(v).replace(/\s/g, '').replace(',', '.').replace('€', '')); return isFinite(n) && n >= 0 ? n : NaN; };
+        o.prix_prod = px('prix_prod'); o.prix_vente = px('prix_vente');
+        if (Number.isNaN(o.prix_prod) || Number.isNaN(o.prix_vente)) return erreurs.push('Ligne ' + (i + 2) + ' : prix invalide');
         o.qte = q; items.push(o);
       });
       const inconnus = Array.from(new Set(items.filter(i => !connus.has(i.produit)).map(i => i.produit)));

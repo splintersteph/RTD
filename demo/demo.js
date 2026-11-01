@@ -38,7 +38,7 @@
     ['sauvegarde_refusee', 'Julien Martin', '192.168.1.103', 700, { raison: 'garde-fou anti-perte' }], ['mdp_change', 'Julien Martin', '192.168.1.103', 1500, {}], ['demarrage', '-', '-', 1560, { port: 8765, tls: false }]
   ].map(e => Object.assign({ ts: iso(e[3]), evt: e[0], user: e[1], ip: e[2] }, e[4]));
   const J = (o, s) => Promise.resolve(new Response(JSON.stringify(o), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));
-  let consoCfg = [{ produit: '7100318946', type: 'Boîte', ref: 'BOX-001', designation: 'Boîte carton 10 pièces', qte: 0.1, fournisseur: 'Cartonnages Alpes', commentaire: '' }, { produit: '7100318946', type: 'Notice', ref: 'NOT-014', designation: 'Notice d\'utilisation FR/EN', qte: 1, fournisseur: '', commentaire: '' }, { produit: '7100318946', type: 'Étiquette', ref: 'ETQ-220', designation: 'Étiquette lot', qte: 1, fournisseur: '', commentaire: '' }];
+  let consoCfg = [{ produit: '7100318946', type: 'Boîte', ref: 'BOX-001', designation: 'Boîte carton 10 pièces', qte: 0.1, fournisseur: 'Cartonnages Alpes', commentaire: '', prix_prod: 0.12, prix_vente: 0.2 }, { produit: '7100318946', type: 'Notice', ref: 'NOT-014', designation: 'Notice d\'utilisation FR/EN', qte: 1, fournisseur: '', commentaire: '', prix_prod: 0.03, prix_vente: 0.05 }, { produit: '7100318946', type: 'Étiquette', ref: 'ETQ-220', designation: 'Étiquette lot', qte: 1, fournisseur: '', commentaire: '', prix_prod: 0.01, prix_vente: 0.02 }];
   let tabsCfg = { hidden: [], custom: [] }; let clientsCfg = {
     BRASSELER: { adresse: '12 rue des Lilas\n69003 Lyon', pays: 'France', contact: 'Service achats', note: '', lieu_incoterm: 'Lyon', incoterm: 'DAP', logo: '' },
     '3M': { adresse: '1 avenue de l\'Industrie\n95000 Cergy', pays: 'France', contact: '', note: '', lieu_incoterm: 'Cergy', incoterm: 'FCA', logo: '' } };
@@ -56,7 +56,7 @@
     }
     if (path === '/api/consommables') {
       if (o && o.method === 'POST') { if (role !== 'admin') return J({ ok: false, error: 'Réservé aux administrateurs.' }, 403); consoCfg = body.items || []; return J({ ok: true, items: consoCfg }); }
-      return J({ items: consoCfg });
+      return J({ items: role === 'admin' ? consoCfg : consoCfg.map(i => { const c = Object.assign({}, i); delete c.prix_prod; delete c.prix_vente; return c; }) });
     }
     if (path === '/api/logout') return J({ ok: true });
     if (path === '/api/password') return J({ ok: true });

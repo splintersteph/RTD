@@ -927,7 +927,9 @@ body.tv .cl-tv-dots b.on{background:var(--glow);transform:scale(1.25)}
 .cli-tab{width:100%;border-collapse:collapse;font-size:13.5px}.cli-tab th{text-align:left;font-size:11.5px;text-transform:uppercase;color:var(--text-muted,#5d6b69);padding:6px 8px;border-bottom:1px solid var(--border,#e6e1d6)}.cli-tab td{padding:9px 8px;border-bottom:1px solid #f0ede4}.cli-tab .r{text-align:right}
 .cli-empty{color:var(--text-muted,#5d6b69);font-size:13.5px}
 
-/* Défilement : dans les vues à bandeau, les blocs gardent leur hauteur et la page défile (au lieu de se tasser et d'être coupés) */
-.flex-view[id^="view-"]>*{flex-shrink:0}
-#view-pdp>div[style*="overflow:hidden"]{flex:none!important;overflow:visible!important}
-#view-pdp>div[style*="overflow:hidden"]>div[style*="overflow-y:auto"]{flex:none!important;overflow:visible!important}
+/* Défilement : la page entière défile, au lieu d'une liste centrale écrasée à quelques lignes sur les petits écrans */
+:is(.flex-view[id^="view-"],#archive-view,#list-view)>*{flex-shrink:0}
+:is(.flex-view[id^="view-"],#archive-view,#list-view)>div[style*="flex:1"]{flex:none!important}
+:is(.flex-view[id^="view-"],#archive-view,#list-view)>div[style*="flex:1"][style*="overflow:hidden"],
+:is(.flex-view[id^="view-"],#archive-view,#list-view)>div[style*="flex:1"][style*="overflow-y:auto"]{overflow:visible!important}
+:is(.flex-view[id^="view-"],#archive-view,#list-view)>div[style*="flex:1"]>div[style*="flex:1"][style*="overflow-y:auto"]{flex:none!important;overflow:visible!important}
