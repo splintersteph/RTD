@@ -38,7 +38,9 @@
     ['sauvegarde_refusee', 'Julien Martin', '192.168.1.103', 700, { raison: 'garde-fou anti-perte' }], ['mdp_change', 'Julien Martin', '192.168.1.103', 1500, {}], ['demarrage', '-', '-', 1560, { port: 8765, tls: false }]
   ].map(e => Object.assign({ ts: iso(e[3]), evt: e[0], user: e[1], ip: e[2] }, e[4]));
   const J = (o, s) => Promise.resolve(new Response(JSON.stringify(o), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));
-  let tabsCfg = { hidden: [], custom: [] };
+  let tabsCfg = { hidden: [], custom: [] }; let clientsCfg = {
+    BRASSELER: { adresse: '12 rue des Lilas\n69003 Lyon', pays: 'France', contact: 'Service achats', note: '', lieu_incoterm: 'Lyon', incoterm: 'DAP', logo: '' },
+    '3M': { adresse: '1 avenue de l\'Industrie\n95000 Cergy', pays: 'France', contact: '', note: '', lieu_incoterm: 'Cergy', incoterm: 'FCA', logo: '' } };
   function fakeApi(path, o) {
     const body = o && o.body ? JSON.parse(o.body) : {};
     if (path === '/api/me') return J({ name: ME, role });
@@ -46,6 +48,10 @@
     if (path === '/api/tabs') {
       if (o && o.method === 'POST') { if (role !== 'admin') return J({ ok: false, error: 'Réservé aux administrateurs.' }, 403); tabsCfg = { hidden: body.hidden || [], custom: body.custom || [] }; return J(Object.assign({ ok: true }, tabsCfg)); }
       return J(tabsCfg);
+    }
+    if (path === '/api/clients') {
+      if (o && o.method === 'POST') { if (role !== 'admin') return J({ ok: false, error: 'Réservé aux administrateurs.' }, 403); if (body.action === 'delete') delete clientsCfg[body.name]; else clientsCfg[body.name] = body.fiche; return J({ ok: true, clients: clientsCfg }); }
+      return J({ clients: clientsCfg });
     }
     if (path === '/api/logout') return J({ ok: true });
     if (path === '/api/password') return J({ ok: true });
@@ -69,7 +75,7 @@
   });
   const f0 = window.fetch.bind(window);
   window.fetch = function (u, o) {
-    if (typeof u === 'string' && /^\/api\/(me|users|audit|logout|password|tabs)$/.test(u)) return fakeApi(u, o);
+    if (typeof u === 'string' && /^\/api\/(me|users|audit|logout|password|tabs|clients)$/.test(u)) return fakeApi(u, o);
     if (typeof u === 'string' && /donnees\.json/.test(u)) return f0(u, Object.assign({}, o, { cache: 'default' })).then(r => r.json()).then(j => new Response(JSON.stringify(walk(j)), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     return f0(u, o);
   };
