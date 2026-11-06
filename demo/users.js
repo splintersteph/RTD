@@ -30,7 +30,7 @@ css.textContent=[
 '.pp-mod input,.pp-mod select{padding:8px 10px;border:1px solid #d5d0c4;border-radius:8px;font:inherit;font-size:13px}',
 '.pp-b{padding:7px 12px;border-radius:8px;border:1px solid #d5d0c4;background:#fff;font:inherit;font-size:12.5px;cursor:pointer;margin-right:4px}.pp-b:hover{background:#f1efe8}',
 '.pp-b.p{background:#0B7F79;color:#fff;border-color:#0B7F79}.pp-b.d{color:#a12a1f}',
-'.pp-tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700}.pp-tag.a{background:#e0f2f0;color:#0B7F79}.pp-tag.l{background:#eef0f6;color:#4b5a86}.pp-tag.x{background:#fdecea;color:#a12a1f}',
+'.pp-tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700}.pp-tag.a{background:#e0f2f0;color:#0B7F79}.pp-tag.l{background:#eef0f6;color:#4b5a86}.pp-tag.x{background:#fdecea;color:#a12a1f}.pp-tag.k{background:#fff3d6;color:#8a5a00}.pp-tag.w{background:#fff3d6;color:#8a5a00}.pp-dot{display:inline-block;min-width:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#d4880a;color:#fff;font-size:11px;text-align:center}',
 '.pp-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 4px}',
 '.pp-msg{margin:10px 0 0;font-size:13px}.pp-msg.e{color:#a12a1f}.pp-msg.o{color:#0B7F79}',
 '.pp-ro-banner{background:#eef0f6;color:#34437a;border-bottom:1px solid #d6dbec;padding:7px 16px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}',
@@ -68,7 +68,7 @@ function lockReadOnly(){
 function mountChip(){
   var host=$('.topbar-right'); if(!host||!window.PP_USER) return;
   var u=window.PP_USER, c=document.createElement('div'); c.className='pp-chip'; c.title='Mon compte';
-  c.innerHTML='<i class="ti ti-user-circle"></i><span>'+esc(u.name)+'</span><small>'+(u.role==='admin'?'Admin':'Lecteur')+'</small>';
+  c.innerHTML='<i class="ti ti-user-circle"></i><span>'+esc(u.name)+'</span><small>'+(u.key?'Key user':u.role==='admin'?'Admin':'Lecteur')+'</small>';
   host.appendChild(c);
   c.addEventListener('click',function(e){
     e.stopPropagation(); var old=$('.pp-menu'); if(old){old.remove();return;}
@@ -94,34 +94,48 @@ function pwdDlg(){
     var m=$('#pp-m',ov); m.className='pp-msg '+(j.ok?'o':'e'); m.textContent=j.ok?'Mot de passe modifié.':(j.error||'Erreur'); }); };
 }
 
+var ROLE_LBL={key:'Key user',admin:'Administrateur',lecteur:'Lecteur'}, ROLE_CLS={key:'k',admin:'a',lecteur:'l'};
+var TYPE_LBL={create:'Création du compte',role:'Changement de profil',delete:'Suppression du compte',enable:'Réactivation du compte'};
 function usersDlg(){
-  var ov=modal('<h2>Utilisateurs</h2><p class="s">Administrateur : voit et modifie tout, gère les comptes. Lecteur : consulte uniquement.</p><div id="pp-ul">Chargement…</div>'
-   +'<h3 style="margin:18px 0 0;font-size:14px">Ajouter un compte</h3>'
+  var KEY=!!(window.PP_USER&&window.PP_USER.key);
+  var ov=modal('<h2>Utilisateurs</h2><p class="s">'+(KEY?'Key user : valide les demandes de l’administrateur et gère tous les comptes. Administrateur : modifie les données. Lecteur : consulte uniquement.':'Vous pouvez demander la création, le changement de profil ou la suppression d’un compte : le key user doit la valider. Vous pouvez désactiver un compte tout de suite.')+'</p><div id="pp-dm"></div><div id="pp-ul">Chargement…</div>'
+   +'<h3 style="margin:18px 0 0;font-size:14px">'+(KEY?'Ajouter un compte':'Demander un compte')+'</h3>'
    +'<div class="pp-row"><input id="pp-un" placeholder="Identifiant" maxlength="40"><input id="pp-up" type="password" placeholder="Mot de passe (12 car. min.)" autocomplete="new-password">'
-   +'<select id="pp-ur"><option value="lecteur">Lecteur</option><option value="admin">Administrateur</option></select><button class="pp-b p" id="pp-add">Créer</button></div>'
+   +'<select id="pp-ur"><option value="lecteur">Lecteur</option><option value="admin">Administrateur</option>'+(KEY?'<option value="key">Key user</option>':'')+'</select><button class="pp-b p" id="pp-add">'+(KEY?'Créer':'Envoyer la demande')+'</button></div>'
    +'<div class="pp-msg" id="pp-m"></div><div class="pp-row"><button class="pp-b" id="pp-x">Fermer</button></div>');
   var msg=function(t,ok){var m=$('#pp-m',ov);m.className='pp-msg '+(ok?'o':'e');m.textContent=t;};
-  var draw=function(list,me){
+  var draw=function(j){
+    var me=j.me, list=j.users;
+    var dm=j.demandes||[];
+    $('#pp-dm',ov).innerHTML=dm.length?'<h3 style="margin:10px 0 6px;font-size:14px">Demandes en attente ('+dm.length+')</h3><table><tr><th>Demande</th><th>Compte</th><th>Profil</th><th>Par</th><th></th></tr>'+dm.map(function(x){
+      var mine=x.demandeur===me;
+      return '<tr><td>'+esc(TYPE_LBL[x.type]||x.type)+'</td><td><b>'+esc(x.name)+'</b></td><td>'+(x.role?esc(ROLE_LBL[x.role]||x.role):'—')+'</td><td>'+esc(x.demandeur)+'</td><td style="white-space:nowrap">'
+       +(KEY&&!mine?'<button class="pp-b p" data-a="approve" data-i="'+esc(x.id)+'">Valider</button><button class="pp-b d" data-a="reject" data-i="'+esc(x.id)+'">Refuser</button>':'')
+       +(mine?'<button class="pp-b" data-a="cancel" data-i="'+esc(x.id)+'">Annuler</button>':'')+'</td></tr>';}).join('')+'</table>':'';
     $('#pp-ul',ov).innerHTML='<table><tr><th>Compte</th><th>Profil</th><th>État</th><th></th></tr>'+list.map(function(u){
-      var self=u.name===me;
+      var self=u.name===me, locked=!KEY&&u.role==='key', nxt=u.role==='lecteur'?'admin':'lecteur';
       return '<tr><td><b>'+esc(u.name)+'</b>'+(self?' <small>(vous)</small>':'')+'</td>'
-       +'<td><span class="pp-tag '+(u.role==='admin'?'a':'l')+'">'+(u.role==='admin'?'Administrateur':'Lecteur')+'</span></td>'
+       +'<td><span class="pp-tag '+ROLE_CLS[u.role]+'">'+ROLE_LBL[u.role]+'</span></td>'
        +'<td>'+(u.disabled?'<span class="pp-tag x">Désactivé</span>':'Actif')+'</td><td style="white-space:nowrap">'
-       +'<button class="pp-b" data-a="role" data-n="'+esc(u.name)+'" data-r="'+(u.role==='admin'?'lecteur':'admin')+'">→ '+(u.role==='admin'?'Lecteur':'Admin')+'</button>'
-       +'<button class="pp-b" data-a="password" data-n="'+esc(u.name)+'">Mot de passe</button>'
-       +'<button class="pp-b" data-a="disable" data-n="'+esc(u.name)+'" data-d="'+(u.disabled?'0':'1')+'">'+(u.disabled?'Réactiver':'Désactiver')+'</button>'
-       +(self?'':'<button class="pp-b d" data-a="delete" data-n="'+esc(u.name)+'">Supprimer</button>')+'</td></tr>';
+       +(locked?'<small>Géré par le key user</small>':
+        '<button class="pp-b" data-a="role" data-n="'+esc(u.name)+'" data-r="'+nxt+'">→ '+ROLE_LBL[nxt]+'</button>'
+       +(KEY&&u.role!=='key'?'<button class="pp-b" data-a="role" data-n="'+esc(u.name)+'" data-r="key">→ Key user</button>':'')
+       +(KEY?'<button class="pp-b" data-a="password" data-n="'+esc(u.name)+'">Mot de passe</button>':'')
+       +'<button class="pp-b" data-a="disable" data-n="'+esc(u.name)+'" data-d="'+(u.disabled?'0':'1')+'">'+(u.disabled?(KEY?'Réactiver':'Demander la réactivation'):'Désactiver')+'</button>'
+       +(self?'':'<button class="pp-b d" data-a="delete" data-n="'+esc(u.name)+'">'+(KEY?'Supprimer':'Demander la suppression')+'</button>'))+'</td></tr>';
     }).join('')+'</table>';
   };
-  var load=function(){api('/api/users').then(function(j){ if(j.users) draw(j.users,j.me); else msg(j.error||'Erreur'); });};
-  var act=function(body,okMsg){api('/api/users','POST',body).then(function(j){ if(j.ok){draw(j.users,window.PP_USER.name);msg(okMsg||'Fait.',true);} else msg(j.error||'Erreur'); });};
+  var load=function(){api('/api/users').then(function(j){ if(j.users) draw(j); else msg(j.error||'Erreur'); });};
+  var act=function(body,okMsg){api('/api/users','POST',body).then(function(j){ if(j.ok){draw(j);msg(j.pending?'Demande envoyée au key user pour validation.':(okMsg||'Fait.'),true);} else msg(j.error||'Erreur'); });};
   $('#pp-x',ov).onclick=function(){ov.remove();};
   $('#pp-add',ov).onclick=function(){act({action:'create',name:$('#pp-un',ov).value,password:$('#pp-up',ov).value,role:$('#pp-ur',ov).value},'Compte créé.');$('#pp-up',ov).value='';};
-  $('#pp-ul',ov).addEventListener('click',function(e){
-    var b=e.target.closest('button'); if(!b)return; var a=b.dataset.a,n=b.dataset.n;
-    if(a==='role') act({action:'role',name:n,role:b.dataset.r},'Profil modifié (la personne devra se reconnecter).');
+  ov.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b||!b.dataset.a)return; var a=b.dataset.a,n=b.dataset.n;
+    if(a==='approve'||a==='cancel') act({action:a,id:b.dataset.i},a==='approve'?'Demande validée.':'Demande annulée.');
+    else if(a==='reject'){ var m=prompt('Motif du refus (facultatif) :'); if(m!==null) act({action:'reject',id:b.dataset.i,motif:m},'Demande refusée.'); }
+    else if(a==='role') act({action:'role',name:n,role:b.dataset.r},'Profil modifié (la personne devra se reconnecter).');
     else if(a==='disable') act({action:'disable',name:n,disabled:b.dataset.d==='1'});
-    else if(a==='delete'){ if(confirm('Supprimer le compte « '+n+' » ?')) act({action:'delete',name:n},'Compte supprimé.'); }
+    else if(a==='delete'){ if(confirm((KEY?'Supprimer':'Demander la suppression de')+' le compte « '+n+' » ?')) act({action:'delete',name:n},'Compte supprimé.'); }
     else if(a==='password'){ var p=prompt('Nouveau mot de passe pour « '+n+' » (12 caractères minimum) :'); if(p) act({action:'password',name:n,password:p},'Mot de passe modifié, sessions fermées.'); }
   });
   load();
@@ -130,7 +144,7 @@ function usersDlg(){
 function auditDlg(){
   var ov=modal('<h2>Journal de sécurité</h2><p class="s">Les 300 derniers événements : connexions, échecs, sauvegardes, changements de comptes. Fichier complet : <code>journal_audit.log</code>.</p><div id="pp-al">Chargement…</div><div class="pp-row"><button class="pp-b" id="pp-x">Fermer</button></div>');
   $('#pp-x',ov).onclick=function(){ov.remove();};
-  var L={login_ok:'Connexion',login_echec:'Échec de connexion',login_bloque:'Connexion bloquée (trop d’essais)',deconnexion:'Déconnexion',sauvegarde:'Sauvegarde des données',sauvegarde_refusee:'Sauvegarde refusée',ecriture_refusee:'Écriture refusée (lecteur)',acces_refuse:'Accès refusé',csrf_refuse:'Requête externe refusée',reseau_refuse:'Réseau non autorisé',mdp_change:'Mot de passe changé',mdp_echec:'Échec changement de mot de passe',demarrage:'Démarrage du serveur'};
+  var L={demande_creee:'Demande de compte',demande_validee:'Demande validée',demande_refusee:'Demande refusée',demande_annulee:'Demande annulée',key_user_designe:'Key user désigné',key_reinitialise:'Key user réinitialisé',login_ok:'Connexion',login_echec:'Échec de connexion',login_bloque:'Connexion bloquée (trop d’essais)',deconnexion:'Déconnexion',sauvegarde:'Sauvegarde des données',sauvegarde_refusee:'Sauvegarde refusée',ecriture_refusee:'Écriture refusée (lecteur)',acces_refuse:'Accès refusé',csrf_refuse:'Requête externe refusée',reseau_refuse:'Réseau non autorisé',mdp_change:'Mot de passe changé',mdp_echec:'Échec changement de mot de passe',demarrage:'Démarrage du serveur'};
   api('/api/audit').then(function(j){
     if(!j.events){$('#pp-al',ov).textContent=j.error||'Erreur';return;}
     $('#pp-al',ov).innerHTML='<table><tr><th>Date</th><th>Événement</th><th>Compte</th><th>Adresse</th><th>Détail</th></tr>'+j.events.map(function(e){
@@ -143,6 +157,7 @@ document.addEventListener('DOMContentLoaded',function(){
   api('/api/me').then(function(j){
     if(!j.name) return;
     window.PP_USER=j; mountChip(); if(j.role!=='admin') lockReadOnly();
+    if(j.key) api('/api/users').then(function(r){ var n=(r.demandes||[]).length; var c=$('.pp-chip'); if(n&&c){ var d=document.createElement('span'); d.className='pp-dot'; d.title=n+' demande(s) à valider'; d.textContent=n; c.appendChild(d); } });
   });
 });
 })();
